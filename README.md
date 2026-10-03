@@ -3,8 +3,8 @@
 A sample manager for external drives and SD cards. Plug a drive in and it shows up. Drop files, folders, zip
 packs or a download link on it and the key and BPM are read for you. Drag any row straight out into your DAW.
 
-Electron, React, TypeScript, Tailwind, Radix, Framer Motion. Design: instrument panel, one typeface (JetBrains Mono),
-one accent colour, no cards, no shadows.
+Electron, React, TypeScript, Tailwind, Radix, Framer Motion. Design: a light DAW (Ableton and Pro Tools on warm
+paper), one typeface (Barlow Semi Condensed), one accent, dark theme as the alternative. See `DESIGN.md`.
 
 ## Run it
 
@@ -30,10 +30,13 @@ docker compose up --build        # http://localhost:5918
   different mount point, and shows as OFFLINE when unplugged.
 - **Import**: drop files, folders or `.zip` packs on the window, or paste a direct download link. Packs unpack to
   `~/Music/Stacks Imports`, downloads land in `~/Downloads/Stacks`.
+- **Exclude a drive**: hover a drive in Places and press the crossed-eye button. It is never scanned again and
+  its samples are hidden (their analysis is kept, so Include brings them straight back). Remembered across restarts.
 - **Key and BPM**: read in the app, off the UI thread, on first sight of a file and cached by size and modified time.
   Key comes out as a name and a Camelot code, with a confidence. A tempo in the file name ("140bpm", "_172") is used
   to settle half and double time when it agrees with the audio. Sounds with no pulse (pads, noise) get no BPM rather
-  than a made up one; unpitched sounds get no key.
+  than a made up one; unpitched sounds get no key. Every tempo is then folded into 70–140: above 140 is halved, below
+  70 is doubled, so a 172 break reads 86 (even when "172" is in its name).
 - **Mixes with**: shows the Camelot neighbours of the selected sample, and can filter the list to what mixes
   (compatible key, tempo within 6%).
 - **Rename**: `084_Am_rhodes_loop_dusty.wav`, on disk, never overwriting (a clash gets `_2`). Idempotent.

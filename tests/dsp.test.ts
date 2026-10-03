@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { analyse } from '@shared/dsp/analyse';
-import { detectBpm } from '@shared/dsp/bpm';
+import { detectBpm, foldBpm } from '@shared/dsp/bpm';
 import { detectKey } from '@shared/dsp/key';
 import { synthLoop } from '@shared/dsp/synth';
 import { compatibleCamelot, keyInfo } from '@shared/camelot';
@@ -78,12 +78,30 @@ describe('analyse', () => {
     expect(a.camelot).toBe('8A');
     expect(a.peaks).toHaveLength(96);
   });
+  it('reports a 172 bpm break at half time, folded into 70-140', () => {
+    const x = synthLoop({ bpm: 172, seconds: 8, sampleRate: SR });
+    expect(analyse(x, SR, 8, 'amen_break_172.wav').bpm).toBe(86);
+  });
   it('leaves a short unpitched hit without bpm or key', () => {
     const x = new Float32Array(SR * 0.2);
     for (let i = 0; i < x.length; i++) x[i] = (Math.random() - 0.5) * Math.exp(-i / 800);
     const a = analyse(x, SR, 0.2, 'hat_closed_tight_12.wav');
     expect(a.kind).toBe('shot');
     expect(a.bpm).toBeNull();
+  });
+});
+
+describe('foldBpm', () => {
+  it('halves above 140 and doubles below 70', () => {
+    expect(foldBpm(172)).toBe(86);
+    expect(foldBpm(290)).toBe(72.5);
+    expect(foldBpm(141)).toBe(70.5);
+    expect(foldBpm(140)).toBe(140);
+    expect(foldBpm(70)).toBe(70);
+    expect(foldBpm(69)).toBe(138);
+    expect(foldBpm(60)).toBe(120);
+    expect(foldBpm(32)).toBe(128);
+    expect(foldBpm(null)).toBeNull();
   });
 });
 

@@ -92,11 +92,51 @@ describe('library', () => {
     expect(moved?.analysis?.bpm).toBe(100);
     expect(lib.get(id)).toBeUndefined();
 
-    const d: Drive = { id: 'sd', name: 'MPC', mount: '/mnt/sd', kind: 'sd', totalBytes: 10, usedBytes: 1, mounted: true };
+    const d: Drive = { id: 'sd', name: 'MPC', mount: '/mnt/sd', kind: 'sd', totalBytes: 10, usedBytes: 1, mounted: true, excluded: false };
     lib.rememberDrives([d]);
     const list = lib.driveList([]);
     expect(list).toHaveLength(1);
     expect(list[0]).toMatchObject({ id: 'sd', mounted: false });
+  });
+});
+
+describe('library exclusions and versions', () => {
+  const resolve = (driveId: string, rel: string) => (driveId === 'sd' ? path.join('/mnt/sd', rel) : null);
+  const file = () => path.join(dir, 'library.json');
+
+  it('hides an excluded drive, keeps its analysis, and remembers the choice', async () => {
+    const lib = new Library(file(), resolve);
+    lib.upsert('sd', [{ relPath: 'a.wav', size: 1, mtimeMs: 1 }]);
+    lib.upsert('usb', [{ relPath: 'b.wav', size: 1, mtimeMs: 1 }]);
+    lib.setAnalysis(sampleId('sd', 'a.wav'), analysis(100));
+    expect(lib.setExcluded('sd', true)).toBe(true);
+    expect(lib.setExcluded('sd', true)).toBe(false);
+    expect(lib.setExcluded('local', true)).toBe(false);
+    expect(lib.all().map((s) => s.driveId)).toEqual(['usb']);
+    lib.rememberDrives([{ id: 'sd', name: 'MPC', mount: '/mnt/sd', kind: 'sd', totalBytes: 10, usedBytes: 1, mounted: true, excluded: false }]);
+    await lib.flush();
+
+    const again = new Library(file(), resolve);
+    await again.load();
+    expect(again.isExcluded('sd')).toBe(true);
+    expect(again.driveList([])[0]).toMatchObject({ id: 'sd', excluded: true });
+    again.setExcluded('sd', false);
+    expect(again.all().find((s) => s.driveId === 'sd')?.analysis?.bpm).toBe(100);
+  });
+
+  it('drops analyses from an older detector version, on load and on rescan', async () => {
+    const lib = new Library(file(), resolve);
+    lib.upsert('sd', [{ relPath: 'old.wav', size: 1, mtimeMs: 1 }]);
+    lib.setAnalysis(sampleId('sd', 'old.wav'), { ...analysis(150), version: ANALYSIS_VERSION - 1 });
+    const changed = lib.upsert('sd', [{ relPath: 'old.wav', size: 1, mtimeMs: 1 }]);
+    expect(changed).toHaveLength(1);
+    expect(changed[0]?.analysis).toBeUndefined();
+
+    lib.setAnalysis(sampleId('sd', 'old.wav'), { ...analysis(150), version: ANALYSIS_VERSION - 1 });
+    await lib.flush();
+    const again = new Library(file(), resolve);
+    await again.load();
+    expect(again.all()[0]?.analysis).toBeUndefined();
   });
 });
 

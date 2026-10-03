@@ -8,6 +8,18 @@ export interface BpmResult {
   strength?: number;
 }
 
+/** Every tempo is reported inside one octave: above 140 is halved, below 70 is doubled. */
+export const BPM_FLOOR = 70;
+export const BPM_CEIL = 140;
+
+export function foldBpm(bpm: number | null): number | null {
+  if (bpm === null || !(bpm > 0)) return bpm;
+  let b = bpm;
+  while (b > BPM_CEIL) b /= 2;
+  while (b < BPM_FLOOR) b *= 2;
+  return Math.round(b * 10) / 10;
+}
+
 const FRAME = 1024;
 const HOP = 256;
 const MIN_BPM = 55;

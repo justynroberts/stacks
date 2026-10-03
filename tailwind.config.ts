@@ -6,13 +6,13 @@ export default {
   theme: {
     // Three sizes only. Hierarchy comes from weight and spacing.
     fontSize: {
-      label: ['11px', { lineHeight: '1.4', letterSpacing: '0.08em' }],
-      body: ['13px', { lineHeight: '1.4' }],
-      readout: ['32px', { lineHeight: '1.15' }]
+      label: ['11px', { lineHeight: '1.35', letterSpacing: '0.1em' }],
+      body: ['14px', { lineHeight: '1.35' }],
+      readout: ['28px', { lineHeight: '1' }]
     },
     borderRadius: { none: '0', sm: 'var(--radius-sm)', DEFAULT: 'var(--radius-sm)' },
     extend: {
-      fontFamily: { mono: ['"JetBrains Mono"', 'ui-monospace', 'Menlo', 'monospace'] },
+      fontFamily: { sans: ['"Barlow Semi Condensed"', '"Arial Narrow"', 'system-ui', 'sans-serif'] },
       colors: {
         bg: 'var(--color-bg)',
         raised: 'var(--color-raised)',
@@ -23,7 +23,10 @@ export default {
         muted: 'var(--color-muted)',
         faint: 'var(--color-faint)',
         accent: 'var(--color-accent)',
-        'accent-ink': 'var(--color-accent-ink)'
+        'accent-ink': 'var(--color-accent-ink)',
+        inset: 'var(--color-inset)',
+        'inset-line': 'var(--color-inset-line)',
+        lcd: 'var(--color-lcd)'
       }
     }
   },

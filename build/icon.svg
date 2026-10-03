@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- macOS icon grid: 824 plate centred on a 1024 canvas. -->
+  <rect x="100" y="100" width="824" height="824" rx="184" fill="#f1efea"/>
+  <rect x="100.5" y="100.5" width="823" height="823" rx="184" fill="none" stroke="#d2cec5" stroke-width="3"/>
+  <g transform="translate(512 512)">
+    <rect x="-276" y="96" width="552" height="132" fill="#17171a"/>
+    <rect x="-276" y="-66" width="392" height="132" fill="#17171a"/>
+    <rect x="-276" y="-228" width="232" height="132" fill="#c2410c"/>
+    <!-- a waveform cut into the base slab: the stack is made of sound -->
+    <path d="M-236 162h20M-196 140v44M-166 128v68M-136 146v32M-106 120v84M-76 136v52M-46 150v24M-16 132v60M14 144v36M44 126v72M74 148v28M104 138v48M134 152v20M164 142v40M194 156v12M224 160v4"
+      stroke="#f1efea" stroke-width="12" stroke-linecap="butt"/>
+  </g>
+</svg>

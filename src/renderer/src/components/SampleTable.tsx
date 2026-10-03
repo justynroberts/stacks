@@ -5,13 +5,13 @@ import { fmtLen, type SortKey } from '../filters';
 import { useStore } from '../store';
 import { Waveform } from './Waveform';
 
-export const ROW = 32;
+export const ROW = 30;
 const rowId = (id: string): string => `row-${id.replace(/[^A-Za-z0-9_-]/g, '_')}`;
-const GRID = 'grid grid-cols-[28px_120px_minmax(0,1fr)_104px_48px_60px_40px_52px_92px] gap-x-2';
+const GRID = 'grid grid-cols-[40px_112px_minmax(0,1fr)_112px_48px_56px_40px_52px_96px] gap-x-3';
 
 const COLS: Array<{ key: SortKey | null; label: string; right?: boolean; pad?: boolean }> = [
   { key: null, label: '#' },
-  { key: null, label: 'WAVE' },
+  { key: null, label: 'CLIP' },
   { key: 'name', label: 'NAME' },
   { key: 'drive', label: 'DRIVE' },
   { key: 'bpm', label: 'BPM', right: true },
@@ -74,9 +74,9 @@ export function SampleTable() {
       tabIndex={0}
       onKeyDown={onKey}
       title="Arrow keys move, space previews"
-      className="mx-6 mt-2 flex min-h-0 flex-1 flex-col outline-offset-2"
+      className="flex min-h-0 flex-1 flex-col outline-offset-[-2px]"
     >
-      <div role="row" className={`${GRID} h-7 flex-none items-center border-b border-line pl-[2px] pr-[10px] text-label font-medium text-faint`}>
+      <div role="row" className={`${GRID} h-7 flex-none items-center border-b border-line-strong pl-[3px] pr-4 text-label font-semibold text-faint`}>
         {COLS.map((c) => {
           const active = c.key !== null && sort.key === c.key;
           return (
@@ -90,7 +90,7 @@ export function SampleTable() {
                 <button
                   type="button"
                   onClick={() => setSort({ key: c.key!, dir: active && sort.dir === 'asc' ? 'desc' : 'asc' })}
-                  className={`hover:text-fg ${active ? 'text-fg' : ''}`}
+                  className={`hover:text-fg ${active ? 'text-fg underline decoration-accent decoration-2 underline-offset-4' : ''}`}
                 >
                   {c.label}
                   {active ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
@@ -106,7 +106,7 @@ export function SampleTable() {
       <div ref={scroller} role="rowgroup" className="min-h-0 flex-1 overflow-y-auto">
         {visible.length === 0 && (
           <div role="row">
-            <div role="gridcell" aria-colspan={9} className="px-4 py-10 text-faint">No samples match. Drop some files above, or plug in a drive.</div>
+            <div role="gridcell" aria-colspan={9} className="px-4 py-10 text-faint">No samples match. Drop files anywhere on the window, or plug in a drive.</div>
           </div>
         )}
         <div role="presentation" style={{ height: virt.getTotalSize(), position: 'relative' }}>
@@ -128,21 +128,25 @@ export function SampleTable() {
                 onClick={() => select(s.id)}
                 onDoubleClick={() => preview.toggle(s.id)}
                 style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: ROW, transform: `translateY(${v.start}px)` }}
-                className={`${GRID} cursor-default items-center border-l-2 pl-[2px] pr-[10px] ${on ? 'border-accent bg-sel' : 'border-transparent hover:bg-raised'} ${s.path ? '' : 'opacity-60'}`}
+                className={`${GRID} cursor-default items-center border-b border-l-[3px] border-b-line pr-4 ${on ? 'border-l-accent bg-sel' : 'border-l-transparent hover:bg-raised'} ${s.path ? '' : 'opacity-60'}`}
               >
-                <span role="gridcell" className="pl-1 text-faint">{String(v.index + 1).padStart(2, '0')}</span>
-                <span role="gridcell" className={on ? 'text-accent' : 'text-faint'}>
-                  <Waveform peaks={a?.peaks} width={120} height={20} bars={40} />
+                <span role="gridcell" className="pl-2 text-label text-faint">{String(v.index + 1).padStart(3, '0')}</span>
+                {/* Each sample is drawn as a clip; the selected one is lit. */}
+                <span role="gridcell" className={`flex h-[22px] items-center border px-1 ${on ? 'border-accent bg-accent text-accent-ink' : 'border-line-strong bg-raised text-muted'}`}>
+                  <Waveform peaks={a?.peaks} width={102} height={18} bars={48} />
                 </span>
-                <span role="gridcell" className={`truncate ${on ? 'font-bold' : ''}`}>
+                <span role="gridcell" className={`truncate ${on ? 'font-bold' : 'font-medium'}`}>
                   {preview.playingId === s.id ? '▶ ' : ''}{s.name}
                 </span>
                 <span role="gridcell" className="truncate text-muted">{driveNames.get(s.driveId) ?? '··'}</span>
-                <span role="gridcell" className="text-right font-medium tabular-nums">{a?.bpm ? Math.round(a.bpm) : '··'}</span>
-                <span role="gridcell" className="pl-3 font-medium">{a?.keyShort ?? '··'}</span>
+                <span role="gridcell" className="text-right font-semibold">{a?.bpm ? Math.round(a.bpm) : '··'}</span>
+                <span role="gridcell" className="pl-3 font-semibold">{a?.keyShort ?? '··'}</span>
                 <span role="gridcell" className="text-muted">{a?.camelot ?? '··'}</span>
-                <span role="gridcell" className="text-right tabular-nums text-muted">{a ? fmtLen(a.durationSec) : '··'}</span>
-                <span role="gridcell" className={`text-label ${st.hot ? 'text-accent' : 'text-faint'}`}>{st.text}</span>
+                <span role="gridcell" className="text-right text-muted">{a ? fmtLen(a.durationSec) : '··'}</span>
+                <span role="gridcell" className={`flex items-center gap-2 text-label font-medium ${st.hot ? 'text-muted' : 'text-faint'}`}>
+                  {st.hot && <span className="h-[6px] w-[6px] flex-none bg-accent" aria-hidden="true" />}
+                  {st.text}
+                </span>
               </div>
             );
           })}

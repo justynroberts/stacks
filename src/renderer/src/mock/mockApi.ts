@@ -1,4 +1,5 @@
 import { encodeWav, synthLoop } from '@shared/dsp/synth';
+import { foldBpm } from '@shared/dsp/bpm';
 import { computePeaks } from '@shared/dsp/peaks';
 import { keyInfo } from '@shared/camelot';
 import { buildName, splitName } from '@shared/filename';
@@ -8,10 +9,10 @@ const SR = 22050;
 const GB = 1e9;
 
 const DRIVES: Drive[] = [
-  { id: 'local', name: 'This computer', mount: '', kind: 'internal', totalBytes: 0, usedBytes: 0, mounted: true },
-  { id: 'ssd', name: 'SAMPLES_SSD', mount: '/Volumes/SAMPLES_SSD', kind: 'usb-ssd', totalBytes: 931 * GB, usedBytes: 712 * GB, mounted: true },
-  { id: 'sd', name: 'MPC_SD_128', mount: '/Volumes/MPC_SD_128', kind: 'sd', totalBytes: 128 * GB, usedBytes: 94 * GB, mounted: true },
-  { id: 'hdd', name: 'ARCHIVE_HDD', mount: '/Volumes/ARCHIVE_HDD', kind: 'usb-hdd', totalBytes: 2000 * GB, usedBytes: 1480 * GB, mounted: true }
+  { id: 'local', name: 'This computer', mount: '', kind: 'internal', totalBytes: 0, usedBytes: 0, mounted: true, excluded: false },
+  { id: 'ssd', name: 'SAMPLES_SSD', mount: '/Volumes/SAMPLES_SSD', kind: 'usb-ssd', totalBytes: 931 * GB, usedBytes: 712 * GB, mounted: true, excluded: false },
+  { id: 'sd', name: 'MPC_SD_128', mount: '/Volumes/MPC_SD_128', kind: 'sd', totalBytes: 128 * GB, usedBytes: 94 * GB, mounted: true, excluded: false },
+  { id: 'hdd', name: 'ARCHIVE_HDD', mount: '/Volumes/ARCHIVE_HDD', kind: 'usb-hdd', totalBytes: 2000 * GB, usedBytes: 1480 * GB, mounted: true, excluded: false }
 ];
 
 // name, drive, bpm, key pitch class + minor, seconds, kind, analysed
@@ -45,7 +46,7 @@ function analysisFor(s: Seed): Analysis {
   const info = key ? keyInfo(key[0], key[1]) : null;
   return {
     version: ANALYSIS_VERSION,
-    bpm,
+    bpm: foldBpm(bpm),
     bpmConf: bpm ? 0.9 : 0,
     key: info?.key ?? null,
     keyShort: info?.keyShort ?? null,
@@ -67,6 +68,7 @@ export interface MockOptions {
 
 /** In-memory stand-in for the Electron bridge. Lets the UI run in a plain browser or in tests. */
 export function createMockApi(opts: MockOptions = {}): StacksApi {
+  const drives: Drive[] = DRIVES.map((d) => ({ ...d }));
   const samples = new Map<string, Sample>();
   const audio = new Map<string, Float32Array>();
   for (const seed of SEEDS) {
@@ -92,7 +94,7 @@ export function createMockApi(opts: MockOptions = {}): StacksApi {
       const id = ID_OF(name, drive);
       samples.set(id, {
         id, driveId: drive, relPath: name, path: `/Volumes/${drive}/${name}`, name, ext: 'wav', size: 1000, mtimeMs: 1,
-        analysis: { version: ANALYSIS_VERSION, bpm: i % 4 === 1 ? 70 + (i % 110) : null, bpmConf: 0.8, key: info.key, keyShort: info.keyShort, camelot: info.camelot, keyConf: 0.8, durationSec: 1 + (i % 20), kind: i % 4 === 0 ? 'shot' : 'loop', peaks, analysedAt: 1 }
+        analysis: { version: ANALYSIS_VERSION, bpm: i % 4 === 1 ? 70 + (i % 71) : null, bpmConf: 0.8, key: info.key, keyShort: info.keyShort, camelot: info.camelot, keyConf: 0.8, durationSec: 1 + (i % 20), kind: i % 4 === 0 ? 'shot' : 'loop', peaks, analysedAt: 1 }
       });
     }
   }
@@ -101,14 +103,25 @@ export function createMockApi(opts: MockOptions = {}): StacksApi {
   const fire = (u: Sample[], r: string[]) => subs.samples.forEach((cb) => cb(u, r));
   const sub = <T,>(set: Set<T>, cb: T) => { set.add(cb); return () => { set.delete(cb); }; };
   let n = 0;
+  const isExcluded = (driveId: string) => drives.find((d) => d.id === driveId)?.excluded ?? false;
 
   const api: StacksApi = {
     platform: 'web',
-    listDrives: async () => DRIVES,
+    listDrives: async () => drives.map((d) => ({ ...d })),
     onDrives: (cb) => sub(subs.drives, cb),
-    listSamples: async () => [...samples.values()],
+    listSamples: async () => [...samples.values()].filter((s) => !isExcluded(s.driveId)),
     onSamples: (cb) => sub(subs.samples, cb),
     scanDrive: async () => undefined,
+    setDriveExcluded: async (driveId, excluded) => {
+      const d = drives.find((x) => x.id === driveId);
+      if (!d || d.id === 'local' || d.excluded === excluded) return;
+      d.excluded = excluded;
+      const mine = [...samples.values()].filter((s) => s.driveId === driveId);
+      if (excluded) fire([], mine.map((s) => s.id));
+      else fire(mine, []);
+      const snapshot = drives.map((x) => ({ ...x }));
+      subs.drives.forEach((cb) => cb(snapshot));
+    },
     addPaths: async (paths) => {
       const added: Sample[] = [];
       for (const p of paths) {
@@ -158,7 +171,7 @@ export function createMockApi(opts: MockOptions = {}): StacksApi {
     },
     copyToDrive: async (id, driveId): Promise<Result<Sample>> => {
       const s = samples.get(id);
-      const d = DRIVES.find((x) => x.id === driveId);
+      const d = drives.find((x) => x.id === driveId);
       if (!s || !d) return { ok: false, error: 'Drive is not connected' };
       const copy: Sample = { ...s, id: ID_OF(`Stacks/${s.name}`, driveId), driveId, relPath: `Stacks/${s.name}`, path: `${d.mount}/Stacks/${s.name}` };
       samples.set(copy.id, copy);

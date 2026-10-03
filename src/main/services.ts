@@ -94,9 +94,17 @@ export class Services {
     }
   }
 
+  setDriveExcluded(driveId: string, excluded: boolean): void {
+    if (!this.library.setExcluded(driveId, excluded)) return;
+    if (excluded) this.emit.samples([], this.library.idsForDrive(driveId));
+    else this.emit.samples(this.library.forDrive(driveId), []);
+    this.emit.drives(this.driveList());
+    if (!excluded) this.scanDrive(driveId);
+  }
+
   scanDrive(driveId: string): void {
     const d = this.watcher.drives.find((x) => x.id === driveId);
-    if (!d) return;
+    if (!d || this.library.isExcluded(driveId)) return;
     this.queue.add(`Scan ${d.name}`, async (update) => {
       update({ stage: 'scanning', progress: -1 });
       const seen = new Set<string>();
@@ -109,7 +117,7 @@ export class Services {
       } catch {
         completed = false;
       }
-      if (completed) {
+      if (completed && !this.library.isExcluded(d.id)) {
         const gone = this.library.idsForDrive(d.id).filter((id) => !seen.has(id));
         if (gone.length) {
           this.library.remove(gone);
@@ -130,6 +138,7 @@ export class Services {
     const byDrive = new Map<string, Array<{ relPath: string; size: number; mtimeMs: number }>>();
     for (const f of files) {
       const { driveId, relPath } = this.locate(f.abs);
+      if (this.library.isExcluded(driveId)) continue;
       const list = byDrive.get(driveId) ?? [];
       list.push({ relPath, size: f.size, mtimeMs: f.mtimeMs });
       byDrive.set(driveId, list);

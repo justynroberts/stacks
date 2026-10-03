@@ -1,6 +1,6 @@
 import { ANALYSIS_VERSION, type Analysis } from '../types';
 import { bpmFromName } from '../filename';
-import { detectBpm } from './bpm';
+import { detectBpm, foldBpm } from './bpm';
 import { detectKey } from './key';
 import { computePeaks } from './peaks';
 
@@ -19,7 +19,7 @@ export function analyse(mono: Float32Array, sampleRate: number, durationSec: num
 
   return {
     version: ANALYSIS_VERSION,
-    bpm: keepBpm ? bpm.bpm : null,
+    bpm: keepBpm ? foldBpm(bpm.bpm) : null,
     bpmConf: keepBpm ? bpm.conf : 0,
     key: key.key ?? null,
     keyShort: key.keyShort ?? null,

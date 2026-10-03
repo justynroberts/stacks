@@ -1,43 +1,12 @@
-import { type FormEvent, useState } from 'react';
-import { useStore } from '../store';
-
+/** Shown over the list while files are dragged onto the window. The drop itself is handled at window level. */
 export function DropZone({ dragging }: { dragging: boolean }) {
-  const { importUrl, notice } = useStore();
-  const [url, setUrl] = useState('');
-  const [busy, setBusy] = useState(false);
-
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!url.trim() || busy) return;
-    setBusy(true);
-    const ok = await importUrl(url.trim());
-    setBusy(false);
-    if (ok) setUrl('');
-  };
-
+  if (!dragging) return null;
   return (
-    <section
-      aria-label="Import"
-      className={`mx-6 mt-4 flex h-[72px] flex-none items-center gap-6 border px-4 ${dragging ? 'border-solid border-accent bg-sel' : 'border-dashed border-line-strong'}`}
-    >
-      <div className="min-w-0 flex-1">
-        <div className="font-bold">{dragging ? 'Drop to import' : 'Drop files, folders or zip packs here'}</div>
-        <div className="mt-[2px] truncate text-label text-faint" role="status" aria-live="polite">
-          {notice ? <span className={notice.error ? 'text-accent' : 'text-muted'}>{notice.text}</span> : 'wav aif flac mp3 ogg · key and BPM on import'}
-        </div>
+    <div aria-hidden="true" className="pointer-events-none absolute inset-2 z-10 flex items-center justify-center border-2 border-dashed border-accent bg-bg">
+      <div className="text-center">
+        <div className="text-readout font-bold">Drop to import</div>
+        <div className="mt-2 text-label font-medium text-muted">FILES · FOLDERS · ZIP PACKS — WAV AIF FLAC MP3 OGG</div>
       </div>
-      <form onSubmit={submit} className="flex h-8 w-[300px] flex-none items-stretch border border-line-strong focus-within:border-accent">
-        <input
-          aria-label="Download link"
-          placeholder="or paste a download link"
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          className="h-full min-w-0 flex-1 border-0 bg-transparent px-[10px] outline-none focus-visible:outline-none"
-        />
-        <button type="submit" disabled={busy || !url.trim()} className="border-l border-line-strong px-3 text-label font-medium">
-          {busy ? 'WAIT' : 'FETCH'}
-        </button>
-      </form>
-    </section>
+    </div>
   );
 }

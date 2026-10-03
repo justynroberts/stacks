@@ -14,6 +14,7 @@ const api: StacksApi = {
   listSamples: () => ipcRenderer.invoke('samples:list'),
   onSamples: (cb) => on<[Sample[], string[]]>('samples:changed', cb),
   scanDrive: (id) => ipcRenderer.invoke('scan:drive', id),
+  setDriveExcluded: (id, excluded) => ipcRenderer.invoke('drive:exclude', id, excluded),
   addPaths: (paths) => ipcRenderer.invoke('import:paths', paths),
   importUrl: (url) => ipcRenderer.invoke('import:url', url),
   onQueue: (cb) => on<[QueueItem[]]>('queue:changed', cb),

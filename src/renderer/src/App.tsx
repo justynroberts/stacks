@@ -50,12 +50,14 @@ function Shell({ api }: { api: StacksApi }) {
       <div className="flex min-h-0 flex-1">
         <Sidebar />
         <main className="flex min-w-0 flex-1 flex-col">
-          <DropZone dragging={dragging} />
           <FilterBar />
-          <SampleTable />
+          <div className="relative flex min-h-0 flex-1 flex-col">
+            <SampleTable />
+            <DropZone dragging={dragging} />
+          </div>
           <ImportQueue />
+          <DetailPanel />
         </main>
-        <DetailPanel />
       </div>
       <StatusBar />
     </div>

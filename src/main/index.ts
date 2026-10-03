@@ -14,10 +14,10 @@ function createWindow(): void {
     height: 900,
     minWidth: 1100,
     minHeight: 640,
-    backgroundColor: '#0B0C0F',
+    backgroundColor: '#F1EFEA',
     title: 'Stacks',
     titleBarStyle: mac ? 'hiddenInset' : 'default',
-    trafficLightPosition: mac ? { x: 16, y: 14 } : undefined,
+    trafficLightPosition: mac ? { x: 18, y: 20 } : undefined,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,

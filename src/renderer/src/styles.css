@@ -1,32 +1,42 @@
+/* MIT License - Copyright (c) fintonlabs.com */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* Light is the default: warm studio paper, graphite ink, one transport orange.
+   The accent is for fills, marks and waveforms only; text is never set in it. */
 :root {
   --radius-sm: 2px;
-  --color-bg: #f2f1ec;
-  --color-raised: #eae8e1;
-  --color-sel: #e2e0d8;
-  --color-line: #d8d5cc;
-  --color-line-strong: #b9b5a8;
-  --color-fg: #14151a;
-  --color-muted: #4a4d56;
-  --color-faint: #5b5f69;
-  --color-accent: #b53206;
+  --color-bg: #f1efea;
+  --color-raised: #e4e1da;
+  --color-sel: #d9d5cb;
+  --color-line: #d2cec5;
+  --color-line-strong: #aaa59a;
+  --color-fg: #17171a;
+  --color-muted: #3e3e44;
+  --color-faint: #56565c;
+  --color-accent: #c2410c;
   --color-accent-ink: #ffffff;
+  /* The counter window: a dark glass in the light chrome, like a hardware readout. */
+  --color-inset: #2a2926;
+  --color-lcd: #f1efea;
+  --color-inset-line: #46443f;
 }
 
 :root.dark {
-  --color-bg: #0b0c0f;
-  --color-raised: #0f1115;
-  --color-sel: #14161b;
-  --color-line: #1d2027;
-  --color-line-strong: #2a2e37;
-  --color-fg: #e8e9ec;
-  --color-muted: #a3a7b0;
-  --color-faint: #7c808b;
-  --color-accent: #ff5b1f;
-  --color-accent-ink: #0b0c0f;
+  --color-bg: #141416;
+  --color-raised: #1b1b1e;
+  --color-sel: #26262a;
+  --color-line: #2a2a2e;
+  --color-line-strong: #45454b;
+  --color-fg: #eceae5;
+  --color-muted: #b4b2ac;
+  --color-faint: #93918c;
+  --color-accent: #ff6b2c;
+  --color-accent-ink: #141416;
+  --color-inset: #0b0b0c;
+  --color-lcd: #eceae5;
+  --color-inset-line: #26262a;
 }
 
 html,
@@ -39,8 +49,9 @@ body,
 body {
   background: var(--color-bg);
   color: var(--color-fg);
-  font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
-  font-size: 13px;
+  font-family: 'Barlow Semi Condensed', 'Arial Narrow', system-ui, sans-serif;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
 }
@@ -70,7 +81,7 @@ body {
 }
 
 :focus-visible {
-  outline: 1px solid var(--color-accent);
+  outline: 2px solid var(--color-accent);
   outline-offset: 1px;
 }
 
@@ -81,9 +92,30 @@ body {
   -webkit-app-region: no-drag;
 }
 
+/* Fine scrollbars in the chrome colours, so the list does not grow a grey OS gutter. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-line-strong);
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.about::backdrop {
+  background: rgb(0 0 0 / 0.35);
+}
+
 @media (prefers-reduced-motion: reduce) {
-  * {
-    transition-duration: 0.01ms !important;
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

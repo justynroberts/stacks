@@ -92,7 +92,8 @@ describe('library screen', () => {
     await user.click(screen.getByRole('button', { name: 'BPM' }));
     await waitFor(() => expect(within(screen.getAllByRole('row')[1]!).getByText('70')).toBeInTheDocument());
     await user.click(screen.getByRole('button', { name: /^BPM/ }));
-    await waitFor(() => expect(within(screen.getAllByRole('row')[1]!).getByText('172')).toBeInTheDocument());
+    // The 172 break is folded to 86, so the fastest is the 140 reese.
+    await waitFor(() => expect(within(screen.getAllByRole('row')[1]!).getByText('140')).toBeInTheDocument());
   });
 
   it('has no accessibility violations axe can find', async () => {
@@ -103,14 +104,36 @@ describe('library screen', () => {
     expect(res.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`)).toEqual([]);
   });
 
-  it('toggles the theme class', async () => {
+  it('starts light and toggles to dark', async () => {
+    localStorage.clear();
     mount();
     const user = userEvent.setup();
-    expect(document.documentElement.classList.contains('dark')).toBe(true);
+    await waitFor(() => expect(document.documentElement.classList.contains('dark')).toBe(false));
     await user.click(screen.getByRole('button', { name: 'Dark theme' }));
-    expect(document.documentElement.classList.contains('dark')).toBe(false);
-    fireEvent.click(screen.getByRole('button', { name: 'Dark theme' }));
     expect(document.documentElement.classList.contains('dark')).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Dark theme' }));
+    expect(document.documentElement.classList.contains('dark')).toBe(false);
+  });
+
+  it('excludes a drive and brings it back', async () => {
+    mount();
+    const user = userEvent.setup();
+    const grid = await screen.findByRole('grid', { name: 'Samples' });
+    await within(grid).findByRole('row', { name: /hat_closed_tight/ });
+    await user.click(screen.getByRole('button', { name: 'Exclude MPC_SD_128' }));
+    await waitFor(() => expect(within(grid).queryByRole('row', { name: /hat_closed_tight/ })).toBeNull());
+    expect(screen.queryByRole('button', { name: /^MPC_SD_128/ })).toBeNull();
+    const excluded = screen.getByRole('region', { name: 'Excluded drives' });
+    await user.click(within(excluded).getByRole('button', { name: 'Include MPC_SD_128' }));
+    expect(await within(grid).findByRole('row', { name: /hat_closed_tight/ })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Excluded drives' })).toBeNull();
+  });
+
+  it('has an about button crediting FintonLabs', async () => {
+    mount();
+    await screen.findByRole('grid', { name: 'Samples' });
+    expect(screen.getByRole('button', { name: 'About this app' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'FintonLabs', hidden: true })).toHaveAttribute('href', 'https://fintonlabs.com');
   });
 });
 
@@ -127,13 +150,14 @@ describe('colour tokens', () => {
   const ratio = (a: string, b: string) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x! + 0.05) / (y! + 0.05); };
 
   for (const [name, t] of [['dark', dark], ['light', light]] as const) {
-    it(`${name}: text and accent meet WCAG AA on every surface`, () => {
-      for (const fg of ['fg', 'muted', 'faint', 'accent']) {
-        for (const bg of ['bg', 'raised', 'sel']) {
-          expect(ratio(t[fg]!, t[bg]!), `${fg} on ${bg}`).toBeGreaterThanOrEqual(4.5);
-        }
+    it(`${name}: text meets WCAG AA on every surface, the accent meets the 3:1 graphics bar`, () => {
+      for (const bg of ['bg', 'raised', 'sel']) {
+        for (const fg of ['fg', 'muted', 'faint']) expect(ratio(t[fg]!, t[bg]!), `${fg} on ${bg}`).toBeGreaterThanOrEqual(4.5);
+        // The accent is never used for text (see styles.css), only for marks, fills and waveforms.
+        expect(ratio(t['accent']!, t[bg]!), `accent on ${bg}`).toBeGreaterThanOrEqual(3);
       }
       expect(ratio(t['accent-ink']!, t['accent']!), 'ink on accent').toBeGreaterThanOrEqual(4.5);
+      expect(ratio(t['lcd']!, t['inset']!), 'counter digits').toBeGreaterThanOrEqual(4.5);
     });
   }
 });

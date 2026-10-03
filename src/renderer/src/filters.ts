@@ -1,8 +1,10 @@
 import { compatibleCamelot } from '@shared/camelot';
+import { BPM_CEIL, BPM_FLOOR } from '@shared/dsp/bpm';
 import type { Sample } from '@shared/types';
 
-export const BPM_MIN = 50;
-export const BPM_MAX = 200;
+// Tempos are folded into one octave on analysis, so the filter covers exactly that.
+export const BPM_MIN = BPM_FLOOR;
+export const BPM_MAX = BPM_CEIL;
 
 export interface Filters {
   drive: string;

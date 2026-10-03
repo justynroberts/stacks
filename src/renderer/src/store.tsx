@@ -32,6 +32,7 @@ export interface Store {
   rename(id: string): Promise<void>;
   copy(id: string, driveId: string): Promise<void>;
   importUrl(url: string): Promise<boolean>;
+  setExcluded(driveId: string, excluded: boolean): Promise<void>;
 }
 
 const Ctx = createContext<Store | null>(null);
@@ -206,14 +207,25 @@ export function StoreProvider({ api, demo, createWorker, children }: { api: Stac
     return r.ok;
   }, [api, setNotice]);
 
+  const setExcluded = useCallback(async (driveId: string, excluded: boolean) => {
+    await api.setDriveExcluded(driveId, excluded);
+    const name = driveNames.get(driveId) ?? 'Drive';
+    setNotice(excluded ? `${name} excluded. It will not be scanned.` : `${name} included. Scanning.`);
+  }, [api, driveNames, setNotice]);
+
+  // A drive filter pointing at a drive that is now excluded would show an empty list with no way to tell why.
+  useEffect(() => {
+    if (filters.drive !== 'all' && drives.some((d) => d.id === filters.drive && d.excluded)) setFiltersState((f) => ({ ...f, drive: 'all' }));
+  }, [drives, filters.drive]);
+
   const counts = runner.current?.counts ?? { queued: 0, running: 0 };
   const analysisCounts = { ...counts, done: samples.reduce((n, s) => n + (s.analysis ? 1 : 0), 0), total: samples.length };
 
   const value: Store = {
-    api, demo, drives, mounted: drives.filter((d) => d.mounted && d.id !== 'local'), samples, visible, selected, select,
+    api, demo, drives, mounted: drives.filter((d) => d.mounted && !d.excluded && d.id !== 'local'), samples, visible, selected, select,
     filters, setFilters: (patch) => setFiltersState((f) => ({ ...f, ...patch })), sort, setSort,
     queue, runState: runner.current?.state ?? new Map(), analysisCounts, driveNames, perDrive, totals, preview, notice,
-    rename, copy, importUrl
+    rename, copy, importUrl, setExcluded
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

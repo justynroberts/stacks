@@ -9,10 +9,13 @@ export interface Drive {
   totalBytes: number;
   usedBytes: number;
   mounted: boolean;
+  /** Excluded drives are never scanned and their samples are hidden. */
+  excluded: boolean;
 }
 
 export const LOCAL_DRIVE_ID = 'local';
-export const ANALYSIS_VERSION = 1;
+/** Bump when detector output changes: cached analyses with another version are thrown away and redone. */
+export const ANALYSIS_VERSION = 2;
 
 export interface Analysis {
   version: number;
@@ -70,6 +73,7 @@ export interface StacksApi {
   listSamples(): Promise<Sample[]>;
   onSamples(cb: (upserts: Sample[], removedIds: string[]) => void): () => void;
   scanDrive(driveId: string): Promise<void>;
+  setDriveExcluded(driveId: string, excluded: boolean): Promise<void>;
   addPaths(paths: string[]): Promise<void>;
   importUrl(url: string): Promise<Result<true>>;
   onQueue(cb: (items: QueueItem[]) => void): () => void;

@@ -144,7 +144,8 @@ async function describe(m: Mount, linux: Map<string, Hints & { label?: string }>
     kind: hints.kind ?? 'external',
     totalBytes: total,
     usedBytes: Math.max(0, total - free),
-    mounted: true
+    mounted: true,
+    excluded: false
   };
 }
 
@@ -155,7 +156,8 @@ export const localDrive = (): Drive => ({
   kind: 'internal',
   totalBytes: 0,
   usedBytes: 0,
-  mounted: true
+  mounted: true,
+  excluded: false
 });
 
 export async function detectDrives(): Promise<Drive[]> {

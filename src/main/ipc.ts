@@ -11,6 +11,9 @@ export function registerIpc(svc: Services): void {
   ipcMain.handle('scan:drive', (_e, driveId: unknown) => {
     if (typeof driveId === 'string') svc.scanDrive(driveId);
   });
+  ipcMain.handle('drive:exclude', (_e, driveId: unknown, excluded: unknown) => {
+    if (typeof driveId === 'string' && typeof excluded === 'boolean') svc.setDriveExcluded(driveId, excluded);
+  });
   ipcMain.handle('import:paths', (_e, paths: unknown) => {
     if (Array.isArray(paths)) svc.addPaths(paths.filter((p): p is string => typeof p === 'string' && p.length > 0));
   });
