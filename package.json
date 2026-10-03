@@ -1,6 +1,6 @@
 {
   "name": "stacks",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Sample manager for external drives and SD cards. Drag in, drag out, key and BPM read automatically.",
   "author": "Fintonlabs",
