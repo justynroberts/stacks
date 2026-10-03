@@ -1,0 +1,50 @@
+{
+  "name": "stacks",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Sample manager for external drives and SD cards. Drag in, drag out, key and BPM read automatically.",
+  "author": "Fintonlabs",
+  "main": "./out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "dev:web": "vite --config vite.web.config.ts",
+    "build": "electron-vite build",
+    "build:web": "vite build --config vite.web.config.ts",
+    "preview": "electron-vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "dist": "npm run build && electron-builder"
+  },
+  "dependencies": {
+    "@fontsource/jetbrains-mono": "^5.3.0",
+    "@radix-ui/react-slider": "^1.4.7",
+    "@radix-ui/react-toggle-group": "^1.1.19",
+    "@tanstack/react-virtual": "^3.14.13",
+    "framer-motion": "^14.0.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "yauzl": "^3.4.0"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.7",
+    "@types/node": "^26.6.4",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@types/yauzl": "^3.4.0",
+    "@vitejs/plugin-react": "^5.2.0",
+    "autoprefixer": "^10.6.1",
+    "axe-core": "^4.13.0",
+    "electron": "^44.5.1",
+    "electron-builder": "^26.15.3",
+    "electron-vite": "^5.0.0",
+    "fflate": "^0.8.3",
+    "jsdom": "^29.1.1",
+    "postcss": "^8.5.28",
+    "tailwindcss": "^3.4.19",
+    "typescript": "^7.0.2",
+    "vite": "^7.3.6",
+    "vitest": "^5.0.3"
+  }
+}

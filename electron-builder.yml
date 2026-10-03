@@ -1,0 +1,15 @@
+appId: com.fintonlabs.stacks
+productName: Stacks
+directories:
+  output: release
+files:
+  - out/**
+  - package.json
+mac:
+  category: public.app-category.music
+  target: [dmg]
+win:
+  target: [nsis]
+linux:
+  target: [AppImage]
+  category: AudioVideo
