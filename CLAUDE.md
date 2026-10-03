@@ -110,7 +110,7 @@ Key invariants:
 - **Releases** (`scripts/release.mjs`, `npm run release -- <ver> [--dry-run]`) are cut locally, never in CI, and only
   when the user asks in that message. Universal dmg + zip, hardened runtime (`build/entitlements.mac.plist`), app
   notarised in `scripts/notarize.cjs` (afterSign), dmg signed → notarised → stapled in `scripts/staple-dmg.cjs`, then
-  `scripts/fix-update-metadata.mjs` re-hashes `latest-mac.yml` (stapling rewrites the dmg). The code repo is private,
-  so artifacts publish to the public **justynroberts/stacks-releases**, which `electron-builder.yml` → `publish` and
+  `scripts/fix-update-metadata.mjs` re-hashes `latest-mac.yml` (stapling rewrites the dmg). Releases publish to this
+  repository (public, so installed copies can read the feed), which `electron-builder.yml` → `publish` and
   `src/main/updater.ts` (electron-updater, DemoDog's pattern: background download, ask before restart, log to
-  `updater.log`) both point at. Ship the zip: macOS installs updates from it, never the dmg.
+  `updater.log`) both point at. One repo, by the user's choice: no separate releases repo. Ship the zip: macOS installs updates from it, never the dmg.

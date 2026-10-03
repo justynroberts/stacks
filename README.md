@@ -8,16 +8,16 @@ paper), one typeface (Barlow Semi Condensed), one accent, dark theme as the alte
 
 ## Install
 
-Download the latest `.dmg` from **[stacks-releases](https://github.com/justynroberts/stacks-releases/releases/latest)**,
-open it and drag Stacks to Applications. It is signed and notarised, runs on Apple silicon and Intel, and updates
-itself: new versions download in the background and Stacks asks before restarting (About → Check for updates to
-look now). This source repository is private; installers live in that public, binaries-only repository.
+Download the latest `.dmg` from **[Releases](https://github.com/justynroberts/stacks/releases/latest)**, open it and
+drag Stacks to Applications. It is signed and notarised, runs on Apple silicon and Intel (macOS 13 or later), and
+updates itself: new versions download in the background and Stacks asks before restarting (About → Check for
+updates to look now).
 
 ## Releasing
 
 ```
 npm run release -- 0.3.0 --dry-run   # build universal, sign, notarise app and dmg, verify; publish nothing
-npm run release -- 0.3.0             # then commit the version, tag, and publish to stacks-releases
+npm run release -- 0.3.0             # then commit the version, tag, and publish a GitHub release here
 ```
 
 Notes go in `release-notes/<version>.md`. The script refuses a dirty tree, an existing version, a missing Developer

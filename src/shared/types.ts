@@ -85,6 +85,8 @@ export interface StacksApi {
   importUrl(url: string): Promise<Result<true>>;
   onQueue(cb: (items: QueueItem[]) => void): () => void;
   readFile(id: string): Promise<ArrayBuffer>;
+  /** The first maxBytes of a file (all of it if smaller), and its full size. Enough to analyse, far less to read. */
+  readHead(id: string, maxBytes: number): Promise<{ bytes: ArrayBuffer; total: number }>;
   saveAnalysis(id: string, analysis: Analysis): Promise<void>;
   renameWithMeta(id: string): Promise<Result<Sample>>;
   copyToDrive(id: string, driveId: string): Promise<Result<Sample>>;
@@ -93,7 +95,7 @@ export interface StacksApi {
   reveal(id: string): void;
   startDrag(id: string): void;
   pathForFile(file: File): string;
-  /** Check the releases repo now. Resolves to a line for the About panel. */
+  /** Check GitHub releases now. Resolves to a line for the About panel. */
   checkForUpdates(): Promise<string>;
 }
 

@@ -19,6 +19,7 @@ const api: StacksApi = {
   importUrl: (url) => ipcRenderer.invoke('import:url', url),
   onQueue: (cb) => on<[QueueItem[]]>('queue:changed', cb),
   readFile: (id) => ipcRenderer.invoke('file:read', id),
+  readHead: (id, maxBytes) => ipcRenderer.invoke('file:readHead', id, maxBytes),
   saveAnalysis: (id, a: Analysis) => ipcRenderer.invoke('analysis:save', id, a),
   renameWithMeta: (id) => ipcRenderer.invoke('file:rename', id),
   copyToDrive: (id, driveId) => ipcRenderer.invoke('file:copy', id, driveId),

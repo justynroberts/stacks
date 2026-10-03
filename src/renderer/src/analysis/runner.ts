@@ -1,5 +1,5 @@
 import type { Analysis, StacksApi } from '@shared/types';
-import { decodeMono } from './decode';
+import { loadForAnalysis } from './decode';
 import type { WorkerRequest, WorkerResponse } from './analysis.worker';
 
 export type RunState = 'queued' | 'running' | 'failed';
@@ -22,9 +22,16 @@ export class AnalysisRunner {
   private active = 0;
   private limit: number;
   private waiting = new Map<string, (r: WorkerResponse) => void>();
+  private retired = new WeakSet<Worker>();
+
+  private retire(w: Worker): void {
+    this.retired.add(w);
+    w.terminate();
+    this.workers = this.workers.filter((x) => x !== w);
+  }
 
   constructor(private deps: Deps) {
-    this.limit = deps.concurrency ?? 2;
+    this.limit = deps.concurrency ?? 3;
   }
 
   enqueue(ids: string[], front = false): void {
@@ -91,10 +98,16 @@ export class AnalysisRunner {
     if (!name) { this.state.delete(id); return; }
     const w = this.worker();
     try {
-      const bytes = await this.deps.api.readFile(id);
-      const dec = await decodeMono(bytes);
+      const dec = await loadForAnalysis(this.deps.api, id);
+      // A worker that never answers would hold this slot for the rest of the session; give up on the file and
+      // replace the worker instead.
       const result = await new Promise<WorkerResponse>((resolve) => {
-        this.waiting.set(id, resolve);
+        const timer = setTimeout(() => {
+          this.waiting.delete(id);
+          this.retire(w);
+          resolve({ id, error: 'timed out' });
+        }, 60_000);
+        this.waiting.set(id, (r) => { clearTimeout(timer); resolve(r); });
         const req: WorkerRequest = { id, name, mono: dec.mono, sampleRate: dec.sampleRate, durationSec: dec.durationSec };
         w.postMessage(req, [dec.mono.buffer]);
       });
@@ -106,7 +119,7 @@ export class AnalysisRunner {
       this.state.set(id, 'failed');
       this.deps.onChange();
     } finally {
-      this.idle.push(w);
+      if (!this.retired.has(w)) this.idle.push(w);
     }
   }
 }

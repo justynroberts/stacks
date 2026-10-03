@@ -21,6 +21,7 @@ export function registerIpc(svc: Services): void {
   });
   ipcMain.handle('import:url', (_e, url: unknown) => (typeof url === 'string' ? svc.importUrl(url) : { ok: false, error: 'Bad link' }));
   ipcMain.handle('file:read', (_e, id: unknown) => svc.readFile(String(id)));
+  ipcMain.handle('file:readHead', (_e, id: unknown, max: unknown) => svc.readHead(String(id), Number(max)));
   ipcMain.handle('analysis:save', (_e, id: unknown, a: unknown) => svc.saveAnalysis(String(id), a as Analysis));
   ipcMain.handle('file:rename', (_e, id: unknown) => svc.renameWithMeta(String(id)));
   ipcMain.handle('file:copy', (_e, id: unknown, driveId: unknown) => svc.copyToDrive(String(id), String(driveId)));

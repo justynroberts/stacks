@@ -23,7 +23,9 @@ function createWindow(): void {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: true
+      sandbox: true,
+      // Analysis runs in this page; a window that is hidden or covered must not slow it to a crawl.
+      backgroundThrottling: false
     }
   });
 

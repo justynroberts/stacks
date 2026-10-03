@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import { splitName } from '@shared/filename';
+import { bpmFromName, splitName } from '@shared/filename';
 import { type Analysis, ANALYSIS_VERSION, type Drive, LOCAL_DRIVE_ID, type Sample } from '@shared/types';
 
 interface Stored {
@@ -37,6 +37,9 @@ export class Library {
       const data = JSON.parse(await fs.readFile(this.file, 'utf8')) as Persisted;
       if (data.version !== 1) return;
       for (const [k, v] of Object.entries(data.samples)) {
+        // v2 -> v3 only changed how a tempo written in the name settles a 3:2 detection, so keep v2 results for
+        // names without one rather than re-reading a whole library.
+        if (v.analysis?.version === 2 && bpmFromName(path.basename(v.relPath)) === null) v.analysis.version = ANALYSIS_VERSION;
         if (v.analysis && v.analysis.version !== ANALYSIS_VERSION) delete v.analysis;
         this.samples.set(k, v);
       }

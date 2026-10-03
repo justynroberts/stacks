@@ -4,14 +4,14 @@ import { app, BrowserWindow, dialog, shell } from 'electron';
 import electronUpdater from 'electron-updater';
 
 /**
- * Checks the public releases repo for a newer build, downloads it in the background and asks before restarting.
+ * Checks this repository's GitHub releases for a newer build, downloads it in the background and asks before restarting.
  * Same shape as DemoDog's updater: quiet on failure (logged, never a dialog for being offline), never installs
  * behind the user's back, and says so when an install did not take.
  */
 
 const { autoUpdater } = electronUpdater;
 
-const RELEASES = 'https://github.com/justynroberts/stacks-releases/releases';
+const RELEASES = 'https://github.com/justynroberts/stacks/releases';
 const FIRST_CHECK_DELAY = 8_000;
 const RECHECK_INTERVAL = 2 * 60 * 60 * 1000;
 const MIN_GAP = 20 * 60 * 1000;

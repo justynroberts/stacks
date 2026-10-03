@@ -247,6 +247,21 @@ export class Services {
 
   // ---- per file actions ----
 
+  async readHead(id: string, maxBytes: number): Promise<{ bytes: ArrayBuffer; total: number }> {
+    const abs = this.absFor(id);
+    if (!abs) throw new Error('Drive is not connected');
+    const want = Math.max(1, Math.min(Number.isFinite(maxBytes) ? Math.floor(maxBytes) : MAX_READ, MAX_READ));
+    const fh = await fs.open(abs, 'r');
+    try {
+      const { size } = await fh.stat();
+      const buf = Buffer.alloc(Math.min(want, size));
+      const { bytesRead } = await fh.read(buf, 0, buf.length, 0);
+      return { bytes: buf.buffer.slice(buf.byteOffset, buf.byteOffset + bytesRead) as ArrayBuffer, total: size };
+    } finally {
+      await fh.close();
+    }
+  }
+
   async readFile(id: string): Promise<ArrayBuffer> {
     const abs = this.absFor(id);
     if (!abs) throw new Error('Drive is not connected');

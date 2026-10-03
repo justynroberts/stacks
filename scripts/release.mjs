@@ -1,8 +1,8 @@
 // MIT License - Copyright (c) fintonlabs.com
 //
 // The only thing in this repository that ships anything. Installed copies update themselves from the latest
-// release in the public binaries repo (justynroberts/stacks-releases), so a release reaches everyone; ordinary
-// commits and `npm run dist` reach no one.
+// GitHub release of this repository, so a release reaches everyone; ordinary commits and `npm run dist` reach
+// no one.
 //
 //   npm run release -- 0.2.0 --dry-run   # build, sign, notarise and verify; publish nothing, leave the tree clean
 //   npm run release -- 0.2.0             # the real thing
@@ -19,7 +19,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const SOURCE_BRANCH = 'master';
-const RELEASES_REPO = 'justynroberts/stacks-releases';
+const RELEASES_REPO = 'justynroberts/stacks';
 const APP = 'Stacks';
 
 const args = process.argv.slice(2);

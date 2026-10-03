@@ -33,12 +33,12 @@ dmg:
     - { x: 400, y: 200, type: link, path: /Applications }
 afterSign: scripts/notarize.cjs
 afterAllArtifactBuild: scripts/staple-dmg.cjs
-# The code repository is private; installers and the update manifest go to a public, binaries-only repo so
-# installed copies can see them.
+# Installers and the update manifest are published as releases of this (public) repository; installed copies read
+# the latest one.
 publish:
   - provider: github
     owner: justynroberts
-    repo: stacks-releases
+    repo: stacks
 win:
   target: [nsis]
 linux:

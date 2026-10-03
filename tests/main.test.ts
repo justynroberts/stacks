@@ -133,10 +133,14 @@ describe('library exclusions and versions', () => {
     expect(changed[0]?.analysis).toBeUndefined();
 
     lib.setAnalysis(sampleId('sd', 'old.wav'), { ...analysis(150), version: ANALYSIS_VERSION - 1 });
+    lib.upsert('sd', [{ relPath: 'break_172bpm.wav', size: 1, mtimeMs: 1 }]);
+    lib.setAnalysis(sampleId('sd', 'break_172bpm.wav'), { ...analysis(115), version: ANALYSIS_VERSION - 1 });
     await lib.flush();
     const again = new Library(file(), resolve);
     await again.load();
-    expect(again.all()[0]?.analysis).toBeUndefined();
+    // v3 only changed how a tempo in the name settles 3:2, so only that file is redone.
+    expect(again.all().find((s) => s.name === 'break_172bpm.wav')?.analysis).toBeUndefined();
+    expect(again.all().find((s) => s.name === 'old.wav')?.analysis?.version).toBe(ANALYSIS_VERSION);
   });
 });
 

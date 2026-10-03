@@ -154,6 +154,12 @@ export function createMockApi(opts: MockOptions = {}): StacksApi {
       if (!x) throw new Error('missing');
       return encodeWav(x, SR);
     },
+    readHead: async (id) => {
+      const x = audio.get(id);
+      if (!x) throw new Error('missing');
+      const bytes = encodeWav(x, SR);
+      return { bytes, total: bytes.byteLength };
+    },
     saveAnalysis: async (id, a) => {
       const s = samples.get(id);
       if (s) samples.set(id, { ...s, analysis: a });
