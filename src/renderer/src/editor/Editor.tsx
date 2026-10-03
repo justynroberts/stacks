@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as edit from '@shared/audio/edit';
 import { findLoops, type LoopPick, loopTempo } from '@shared/audio/loop';
+import { findLoopSet } from '@shared/audio/loopset';
 import { frameCount, type PcmAudio, writeWav } from '@shared/audio/wav';
 import type { EditTarget, Sample } from '@shared/types';
 import { useStore } from '../store';
 import { decodeForEdit, type Loaded } from './load';
+import { LoopSetPanel, type SetMode, type SetRow } from './LoopSetPanel';
 import { Overview } from './Overview';
 import { span, summarise } from './peaks';
 import { Player } from './player';
@@ -115,7 +117,7 @@ export function Editor({ sample }: { sample: Sample }) {
   const summary = useMemo(() => (audio ? summarise(audio) : null), [audio]);
   // A tempo found by autoloop stands in when the analysis has none.
   const [foundBpm, setFoundBpm] = useState<number | null>(null);
-  const bpm = sample.analysis?.bpm ?? foundBpm;
+  const bpm = foundBpm ?? sample.analysis?.bpm ?? null;
   const [picks, setPicks] = useState<{ for: PcmAudio; list: LoopPick[]; i: number } | null>(null);
   const [hint, setHint] = useState<string | null>(null);
   useEffect(() => {
@@ -218,7 +220,8 @@ export function Editor({ sample }: { sample: Sample }) {
   // ---- transport ----
   const play = useCallback(() => {
     if (!audio) return;
-    if (player.current.playing) return stop();
+    if (player.current.playing) { setAuditioning(null); return stop(); }
+    reversedPlay.current = false;
     const [from, to] = hasSel ? sel : [sel[0] >= n ? 0 : sel[0], n];
     player.current.play(audio, from, to, loop && hasSel, () => setPlaying(false));
     setPlaying(player.current.playing);
@@ -228,10 +231,10 @@ export function Editor({ sample }: { sample: Sample }) {
   // start on the next pass). Toggling Loop mid-play carries on rather than restarting.
   // Selections under 10 ms (a drag just starting) are skipped so the loop never buzzes.
   useEffect(() => {
-    if (playing && sel[1] - sel[0] >= rate * 0.01) player.current.updateLoop(sel[0], sel[1]);
+    if (playing && !reversedPlay.current && sel[1] - sel[0] >= rate * 0.01) player.current.updateLoop(sel[0], sel[1]);
   }, [playing, sel, rate]);
   useEffect(() => {
-    if (playing && (hasSel || !loop)) player.current.setLooping(loop && hasSel, sel[0], sel[1]);
+    if (playing && !reversedPlay.current && (hasSel || !loop)) player.current.setLooping(loop && hasSel, sel[0], sel[1]);
   }, [loop]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Playhead follows the audio without re-rendering React every frame.
@@ -246,7 +249,7 @@ export function Editor({ sample }: { sample: Sample }) {
       if (el) {
         const v = viewRef.current;
         const x = pos === null ? -1 : (pos - v.start) / v.spp;
-        el.style.display = x >= 0 && x <= width ? 'block' : 'none';
+        el.style.display = !reversedPlay.current && x >= 0 && x <= width ? 'block' : 'none';
         el.style.transform = `translateX(${x}px)`;
       }
       raf = requestAnimationFrame(tick);
@@ -295,7 +298,7 @@ export function Editor({ sample }: { sample: Sample }) {
     if (!audio) return;
     let current = picks && picks.for === audio ? picks : null;
     if (!current) {
-      const tempo = loopTempo(audio, bpm);
+      const tempo = loopTempo(audio, bpm, sample.name);
       if (!tempo) { setHint('No steady tempo to loop to'); return; }
       if (!bpm) setFoundBpm(tempo);
       const list = findLoops(audio, tempo);
@@ -308,7 +311,100 @@ export function Editor({ sample }: { sample: Sample }) {
     setSel([p.start, p.end]);
     setLoop(true);
     setHint(`${p.bars} ${p.bars === 1 ? 'bar' : 'bars'} · candidate ${i + 1} of ${current.list.length}`);
-  }, [audio, picks, bpm]);
+  }, [audio, picks, bpm, sample.name]);
+
+  // ---- found loops: a whole set across the sample, to audition, adjust and export ----
+  const [found, setFound] = useState<{ for: PcmAudio; tempo: number | null; bars: number; mode: SetMode; rows: SetRow[] } | null>(null);
+  const [activeRow, setActiveRow] = useState<number | null>(null);
+  const [alsoReversed, setAlsoReversed] = useState(false);
+  /** What was last asked for, set the moment it is clicked (the result arrives a moment later). */
+  const [setOpts, setSetOpts] = useState<{ bars: number; mode: SetMode }>({ bars: 4, mode: 'best' });
+  const [setBusy, setSetBusy] = useState<string | null>(null);
+  const [auditioning, setAuditioning] = useState<number | null>(null);
+  /** A reversed audition plays a separate buffer, so the playhead has nothing true to show. */
+  const reversedPlay = useRef(false);
+
+  const findSet = useCallback((bars: number, mode: SetMode) => {
+    if (!audio) return;
+    stop();
+    setAuditioning(null);
+    setSetOpts({ bars, mode });
+    setSetBusy('Finding loops');
+    // Let the panel paint "finding" before a few hundred milliseconds of analysis.
+    setTimeout(() => {
+      const tempo = loopTempo(audio, bpm, sample.name);
+      const set = tempo ? findLoopSet(audio, tempo, { bars, mode }) : null;
+      // The refined tempo is the better one for snapping and bar counts from here on.
+      if (set && Math.abs(set.bpm - (bpm ?? 0)) > 0.01) setFoundBpm(set.bpm);
+      setFound({ for: audio, tempo: set?.bpm ?? null, bars, mode, rows: (set?.loops ?? []).map((l) => ({ ...l, include: true, reverse: false })) });
+      setActiveRow(null);
+      setSetBusy(null);
+      if (!tempo) setHint('No steady tempo to find loops by');
+    }, 30);
+  }, [audio, bpm, stop, sample.name]);
+
+  const pickRow = useCallback((i: number) => {
+    const r = found?.rows[i];
+    if (!r) return;
+    setActiveRow(i);
+    setSel([r.start, r.end]);
+    setLoop(true);
+    const len = r.end - r.start;
+    const spp = len * 1.15 > width * view.spp ? (len * 1.15) / width : view.spp;
+    userView({ spp, start: r.start - (width * spp - len) / 2 });
+  }, [found, width, view.spp, userView]);
+
+  const audition = useCallback((i: number) => {
+    const r = found?.rows[i];
+    if (!audio || !r) return;
+    if (auditioning === i) { stop(); setAuditioning(null); return; }
+    pickRow(i);
+    stop();
+    const done = () => { setPlaying(false); setAuditioning(null); };
+    if (r.reverse) {
+      const seg = edit.trim(audio, [r.start, r.end]);
+      const rev = edit.reverse(seg, [0, frameCount(seg)]);
+      reversedPlay.current = true;
+      player.current.play(rev, 0, frameCount(rev), true, done);
+    } else {
+      reversedPlay.current = false;
+      player.current.play(audio, r.start, r.end, true, done);
+    }
+    setPlaying(player.current.playing);
+    setAuditioning(i);
+  }, [audio, found, auditioning, pickRow, stop]);
+
+  const updateRow = useCallback((i: number, patch: Partial<SetRow>) => {
+    setFound((f) => (f ? { ...f, rows: f.rows.map((r, k) => (k === i ? { ...r, ...patch } : r)) } : f));
+  }, []);
+
+  const exportSet = useCallback(async () => {
+    if (!audio || !loaded || !found || found.for !== audio) return;
+    const jobs: Array<{ seg: PcmAudio; label: string }> = [];
+    found.rows.forEach((r, i) => {
+      if (!r.include) return;
+      const seg = edit.trim(audio, [r.start, r.end]);
+      const nn = String(i + 1).padStart(2, '0');
+      const label = Number.isInteger(r.bars) ? `loop${nn}_${r.bars}bar` : `loop${nn}`;
+      jobs.push({ seg, label });
+      if (r.reverse || alsoReversed) jobs.push({ seg: edit.reverse(seg, [0, frameCount(seg)]), label: `${label}_rev` });
+    });
+    stop();
+    setAuditioning(null);
+    let done = 0;
+    for (const j of jobs) {
+      setSetBusy(`Exporting ${done + 1} of ${jobs.length}`);
+      const saved = await saveEdit(sample.id, writeWav(j.seg, loaded.format), { kind: 'new', driveId: destId || null, label: j.label });
+      if (!saved) break;
+      done++;
+    }
+    setSetBusy(null);
+    if (done === jobs.length) setHint(`Exported ${done} ${done === 1 ? 'file' : 'files'}${destId ? ` to ${mounted.find((d) => d.id === destId)?.name ?? 'drive'} / Stacks` : ' beside the original'}`);
+  }, [audio, loaded, found, alsoReversed, stop, saveEdit, sample.id, destId, mounted]);
+
+  const rowSelectionDiffers = found && activeRow !== null && found.rows[activeRow]
+    ? hasSel && (sel[0] !== found.rows[activeRow]!.start || sel[1] !== found.rows[activeRow]!.end)
+    : false;
 
   /** Select n bars from the cursor (or the start of the selection). */
   const selectBars = useCallback((count: number) => {
@@ -449,6 +545,13 @@ export function Editor({ sample }: { sample: Sample }) {
         </Group>
         <Group label="Loop">
           <Tool
+            label="FIND LOOPS"
+            title="Find a set of loops across the whole sample (one per section), to audition, reverse and export as files"
+            onClick={() => findSet(setOpts.bars, setOpts.mode)}
+            disabled={!audio || !!setBusy}
+            active={!!found}
+          />
+          <Tool
             label={picks && picks.for === audio ? `AUTO LOOP ${picks.i + 1}/${picks.list.length}` : 'AUTO LOOP'}
             title="Find the best 4, 2 or 1 bar loop: on the beat, starting on a hit, wrapping cleanly. Press again for the next candidate."
             onClick={autoLoop}
@@ -478,6 +581,7 @@ export function Editor({ sample }: { sample: Sample }) {
             beat={beat}
             playhead={playhead}
             onWidth={setWidth}
+            regions={found && found.for === audio ? found.rows.map((r, i) => ({ start: r.start, end: r.end, active: i === activeRow })) : undefined}
             label={`Waveform of ${sample.name}, ${audio.channels.length === 1 ? 'mono' : `${audio.channels.length} channels`}. Drag to select.`}
           />
         ) : (
@@ -485,6 +589,30 @@ export function Editor({ sample }: { sample: Sample }) {
         )}
         {audio && summary && <Overview audio={audio} summary={summary} view={view} width={width} sel={sel} onView={userView} />}
       </div>
+
+      {(found || setBusy === 'Finding loops') && (
+        <LoopSetPanel
+          rows={found?.rows ?? []}
+          rate={rate}
+          tempo={found?.tempo ?? bpm}
+          mode={setOpts.mode}
+          bars={setOpts.bars}
+          stale={!!found && found.for !== audio}
+          active={activeRow}
+          selectionDiffers={rowSelectionDiffers}
+          alsoReversed={alsoReversed}
+          busy={setBusy}
+          auditioning={auditioning}
+          onFind={findSet}
+          onPick={pickRow}
+          onAudition={audition}
+          onToggle={(i, key) => { const r = found?.rows[i]; if (r) updateRow(i, { [key]: !r[key] }); if (key === 'reverse' && auditioning === i) { stop(); setAuditioning(null); } }}
+          onUseSelection={(i) => updateRow(i, { start: sel[0], end: sel[1], bars: beat ? Math.round(((sel[1] - sel[0]) / (beat * 4)) * 100) / 100 : 0 })}
+          onAlsoReversed={setAlsoReversed}
+          onExport={() => void exportSet()}
+          onClose={() => { if (auditioning !== null) { stop(); setAuditioning(null); } setFound(null); setActiveRow(null); }}
+        />
+      )}
 
       {/* Transport and selection counter */}
       <div className="flex h-16 flex-none items-center gap-4 border-t border-line-strong bg-raised px-4">

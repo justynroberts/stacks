@@ -177,3 +177,95 @@ describe('findLoops', () => {
     expect(findLoops({ sampleRate: SR, channels: [new Float32Array(1000)] }, 120)).toEqual([]);
   });
 });
+
+describe('findLoopSet', () => {
+  const SR = 22050;
+  /** An A B A arrangement at 120 bpm (one bar = 2 s), with a little silence first, plus hats in B. */
+  async function song() {
+    const { synthLoop } = await import('@shared/dsp/synth');
+    const a = synthLoop({ bpm: 120, seconds: 16, sampleRate: SR, chordPcs: [9, 0, 4] });
+    const b = synthLoop({ bpm: 120, seconds: 16, sampleRate: SR, chordPcs: [2, 5, 9] });
+    for (let i = 0; i < b.length; i++) {
+      const t = (i % (SR / 4)) / SR; // a hat every 8th
+      b[i] = b[i]! + (t < 0.02 ? (Math.sin(i * 1.7) * 0.3 * (1 - t / 0.02)) : 0);
+    }
+    const lead = Math.round(SR * 0.5);
+    const x = new Float32Array(lead + a.length * 2 + b.length);
+    x.set(a, lead); x.set(b, lead + a.length); x.set(a, lead + a.length + b.length);
+    return { audio: { sampleRate: SR, channels: [x] }, lead, sec: SR * 16 };
+  }
+
+  it('finds distinct, bar-aligned, non-overlapping loops: one per section', async () => {
+    const { findLoopSet } = await import('@shared/audio/loopset');
+    const { audio, lead, sec } = await song();
+    const set = findLoopSet(audio, 120, { bars: 4 });
+    expect(set.loops.length).toBeGreaterThanOrEqual(2);
+    const bar = SR * 2;
+    for (const l of set.loops) {
+      const off = ((l.start - lead) % bar + bar) % bar;
+      expect(Math.min(off, bar - off)).toBeLessThan(SR * 0.01);
+      expect(Math.abs(l.end - l.start - bar * 4)).toBeLessThan(SR * 0.005);
+    }
+    for (let i = 1; i < set.loops.length; i++) expect(set.loops[i]!.start).toBeGreaterThanOrEqual(set.loops[i - 1]!.end - SR * 0.005);
+    const inside = (l: { start: number; end: number }, from: number, to: number) => l.start >= from - SR * 0.01 && l.end <= to + SR * 0.01;
+    const inA = set.loops.filter((l) => inside(l, lead, lead + sec) || inside(l, lead + 2 * sec, lead + 3 * sec));
+    const inB = set.loops.filter((l) => inside(l, lead + sec, lead + 2 * sec));
+    expect(inB.length).toBe(1);
+    expect(inA.length).toBe(1); // A comes round twice but is kept once
+    expect(inA.length + inB.length).toBe(set.loops.length); // nothing straddles a section change
+  });
+
+  it('splits the whole track into consecutive loops in "all" mode', async () => {
+    const { findLoopSet } = await import('@shared/audio/loopset');
+    const { audio } = await song();
+    const set = findLoopSet(audio, 120, { bars: 4, mode: 'all' });
+    expect(set.loops.length).toBe(6); // 24 bars of music
+    for (let i = 1; i < set.loops.length; i++) expect(Math.abs(set.loops[i]!.start - set.loops[i - 1]!.end)).toBeLessThan(SR * 0.05);
+  });
+});
+
+describe('whole-track tempo and headers', () => {
+  it('refines a slightly wrong tempo against the whole track', async () => {
+    const { synthLoop } = await import('@shared/dsp/synth');
+    const { findLoopSet } = await import('@shared/audio/loopset');
+    const SR = 22050;
+    const x = synthLoop({ bpm: 120, seconds: 60, sampleRate: SR, chordPcs: [9, 0, 4] });
+    const set = findLoopSet({ sampleRate: SR, channels: [x] }, 121, { bars: 4 });
+    expect(Math.abs(set.bpm - 120)).toBeLessThan(0.05);
+    // Every loop is the true 4 bars long, not 4 bars at the wrong tempo.
+    for (const l of set.loops) expect(Math.abs(l.end - l.start - SR * 8)).toBeLessThan(SR * 0.005);
+  });
+
+  it('reads the sample rate of an MP3 behind an ID3 tag, and of Opus', () => {
+    const mp3 = new Uint8Array(10 + 20 + 8);
+    mp3.set([0x49, 0x44, 0x33, 4, 0, 0, 0, 0, 0, 20]); // ID3v2.4, 20 byte tag
+    mp3.set([0xff, 0xfb, 0x94, 0x64], 30); // MPEG1 layer III, 128 kbps, 48 kHz
+    expect(sniffSampleRate(mp3.buffer)).toBe(48000);
+    const bare = Uint8Array.of(0xff, 0xf3, 0x90, 0x64, 0, 0, 0, 0, 0, 0, 0, 0); // MPEG2 layer III, 22.05 kHz
+    expect(sniffSampleRate(bare.buffer)).toBe(22050);
+    const opus = new TextEncoder().encode('OggS\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0OpusHead');
+    expect(sniffSampleRate(opus.buffer as ArrayBuffer)).toBe(48000);
+  });
+});
+
+describe('3:2 tempo mistakes', () => {
+  it('a loop set given 2/3 of the real tempo finds the real one', async () => {
+    const { synthLoop } = await import('@shared/dsp/synth');
+    const { findLoopSet } = await import('@shared/audio/loopset');
+    const SR = 22050;
+    const x = synthLoop({ bpm: 123, seconds: 40, sampleRate: SR, chordPcs: [9, 0, 4] });
+    const set = findLoopSet({ sampleRate: SR, channels: [x] }, 82, { bars: 4 });
+    expect(Math.abs(set.bpm - 123)).toBeLessThan(0.1);
+    expect(set.loops.length).toBeGreaterThan(0);
+  });
+
+  it('a "123 BPM" in the name settles a 3:2 detection', async () => {
+    const { detectBpm } = await import('@shared/dsp/bpm');
+    const SR = 22050;
+    // Kicks on every other beat of 123 read as a slower pulse; the name says what it is.
+    const x = new Float32Array(SR * 12);
+    const beat = (60 / 123) * SR;
+    for (let b = 0; b * beat < x.length; b++) for (let i = 0; i < 2000 && b * beat + i < x.length; i++) x[Math.floor(b * beat) + i] = x[Math.floor(b * beat) + i]! + (b % 3 === 0 ? 0.9 : 0.35) * Math.exp(-i / 300) * Math.sin(i / 6);
+    expect(detectBpm(x, SR, 12, 123).bpm).toBe(123);
+  });
+});

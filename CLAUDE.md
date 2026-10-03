@@ -49,6 +49,10 @@ WAV is decoded by `shared/audio/wav.ts` (exact, native rate and depth); other fo
 `sniffSampleRate` reads from the header. Edits are pure functions in `shared/audio/edit.ts` that return new audio,
 so undo is a stack of snapshots (capped by bytes). Auto loop is `shared/audio/loop.ts` (`findLoops`, ranked; onset
 envelope frame i is a 4-hop window, so a hit at frame f peaks near index f/hop − 2 — keep that offset).
+`shared/audio/loopset.ts` (`findLoopSet`) is the whole-track version: 3:2 tempo hypotheses compared by hits per
+minute after each is refined, then a least-squares fit of attack time vs beat number for the exact beat length and
+phase; per-bar fingerprints (12 log bands + 12-bin chroma) for steadiness, repeat-at-the-seam and section changes.
+`editor/LoopSetPanel.tsx` is its UI.
 `editor/player.ts` plays a loop as a chain of one-pass sources scheduled sample-accurately ~250 ms ahead (not a
 single looping source), so moved loop points apply from the next pass; `tests/player.test.ts` drives it with a fake
 clock (`new Player(fakeCtx, false)` + `tick()`). Drawing is canvas (`WaveView`, `Overview`) over a min/max

@@ -77,6 +77,14 @@ docker compose up --build        # http://localhost:5918
 - **Drag out**: drag a row into Ableton, Finder, anything that accepts a file drag.
 - **Keyboard**: arrows, Home/End, Page up/down move; Space previews; L loops the preview; E opens the editor; click a
   column header to sort.
+- **Find loops** (editor): load a whole track (an MP3 is fine) and get a set of loops across it. The tempo is
+  refined against the entire song (a slightly wrong or 3:2-confused tempo is corrected), the bar grid is fitted to
+  the real attacks, and every bar-aligned 1/2/4/8 bar loop is scored on hits landing on the beat, steady content, the
+  music repeating where the loop wraps, and level. **Best** keeps one loop per section (no overlaps, a repeated chorus
+  once, nothing that crosses a section change); **Split** cuts the whole track into consecutive loops. Each loop is
+  marked on the waveform and can be auditioned (forward or reversed), selected, re-cut from your own selection, and
+  ticked for export; **+ reversed copies** adds a `_rev` file for each. Export writes `name_loop03_4bar.wav` (and
+  `_rev`) beside the original or into a drive's `Stacks` folder.
 - **Loop preview**: LOOP in the clip view (or L) loops the whole sample gaplessly through Web Audio, so a click or a
   bad tail at the seam is audible before you open the editor. It stays on as you move between samples and can be
   switched mid-play without restarting.
@@ -104,7 +112,10 @@ The library cache is one JSON file in the app's user data folder (`library.json`
   Fades are linear, and there is no dither when going down to 16-bit.
 - **Rename only changes the file name.** It does not write BPM or key tags inside the file yet.
 - **Links must be direct** (a file or a zip). Pages that sit behind a login or a download button will not work.
-- Only the first 90 seconds of long files are analysed, and files over 400 MB are skipped.
+- Only the first 90 seconds of long files are analysed for key and BPM (Find loops uses the whole track), and files
+  over 400 MB are skipped.
+- **Find loops assumes a steady tempo** (anything made to a click). It runs on the main thread: about a second for a
+  3½ minute song, during which the window does not respond.
 - Drive type (SD, SSD, HDD) comes from the OS (`lsblk` on Linux, `diskutil` on macOS, WMI on Windows) and falls
   back to "External". The macOS and Windows paths are written but have not been run on those systems.
 

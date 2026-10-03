@@ -49,9 +49,11 @@ interface Props {
   playhead: RefObject<HTMLDivElement | null>;
   onWidth(w: number): void;
   label: string;
+  /** Found loops, drawn as numbered bands under the ruler. */
+  regions?: Array<{ start: number; end: number; active: boolean }>;
 }
 
-export function WaveView({ audio, summary, view, onView, sel, onSel, snap, beat, playhead, onWidth, label }: Props) {
+export function WaveView({ audio, summary, view, onView, sel, onSel, snap, beat, playhead, onWidth, label, regions }: Props) {
   const box = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const n = frameCount(audio);
@@ -138,6 +140,25 @@ export function WaveView({ audio, summary, view, onView, sel, onSel, snap, beat,
       ctx.fillRect(Math.max(0, x(n)), RULER_H, w - Math.max(0, x(n)), h - RULER_H);
     }
 
+    // Found loops: a band and a number under the ruler, the active one in the accent.
+    if (regions?.length) {
+      ctx.font = '600 11px "Barlow Semi Condensed", "Arial Narrow", sans-serif';
+      ctx.textBaseline = 'top';
+      regions.forEach((r, i) => {
+        const rx = x(r.start), rw = x(r.end) - rx;
+        if (rx + rw < 0 || rx > w) return;
+        ctx.fillStyle = r.active ? p.accent : p.lineStrong;
+        ctx.fillRect(Math.max(0, rx) + 1, RULER_H + 1, Math.max(2, Math.min(w, rx + rw) - Math.max(0, rx) - 2), 5);
+        // The number sits on a chip of the ground colour so it reads over a loud waveform.
+        const label = String(i + 1).padStart(2, '0');
+        const lx = Math.max(0, rx) + 2;
+        ctx.fillStyle = r.active ? p.accent : p.bg;
+        ctx.fillRect(lx, RULER_H + 7, ctx.measureText(label).width + 8, 15);
+        ctx.fillStyle = r.active ? p.bg : p.muted;
+        ctx.fillText(label, lx + 4, RULER_H + 9);
+      });
+    }
+
     // Selection edges (or the cursor), in the accent.
     ctx.fillStyle = p.accent;
     for (const f of e > s ? [s, e] : [s]) {
@@ -178,7 +199,7 @@ export function WaveView({ audio, summary, view, onView, sel, onSel, snap, beat,
       ctx.fillStyle = p.accent;
       ctx.fillRect(Math.max(0, x(s)), RULER_H - 3, Math.min(w, x(e)) - Math.max(0, x(s)), 3);
     }
-  }, [audio, summary, view, sel, beat, n]);
+  }, [audio, summary, view, sel, beat, n, regions]);
 
   useLayoutEffect(draw, [draw]);
 

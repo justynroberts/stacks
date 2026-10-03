@@ -118,7 +118,7 @@ function extended80(v: DataView, o: number): number {
 
 /**
  * The file's own sample rate, read from its header, so Web Audio can decode without resampling. Null when the
- * format does not say cheaply (MP3, Ogg, M4A); the caller then picks a common rate.
+ * format does not say cheaply (M4A); the caller then picks a common rate.
  */
 export function sniffSampleRate(buf: ArrayBuffer): number | null {
   if (buf.byteLength < 12) return null;
@@ -138,6 +138,34 @@ export function sniffSampleRate(buf: ArrayBuffer): number | null {
       if (tag(v, o) === 'COMM' && o + 26 <= buf.byteLength) return Math.round(extended80(v, o + 16)) || null;
       o += 8 + size + (size & 1);
     }
+    return null;
+  }
+  const bytes = new Uint8Array(buf);
+  // MP3: skip an ID3v2 tag (its size is 4 syncsafe bytes), then read the first frame header.
+  if (head.startsWith('ID3') || (bytes[0] === 0xff && (bytes[1]! & 0xe0) === 0xe0)) {
+    let o = 0;
+    if (head.startsWith('ID3') && buf.byteLength >= 10) {
+      o = 10 + (((bytes[6]! & 0x7f) << 21) | ((bytes[7]! & 0x7f) << 14) | ((bytes[8]! & 0x7f) << 7) | (bytes[9]! & 0x7f));
+      if (bytes[5]! & 0x10) o += 10; // footer
+    }
+    const RATES: Record<number, number[]> = { 3: [44100, 48000, 32000], 2: [22050, 24000, 16000], 0: [11025, 12000, 8000] };
+    for (let i = o; i + 4 <= Math.min(buf.byteLength, o + 65536); i++) {
+      if (bytes[i] !== 0xff || (bytes[i + 1]! & 0xe0) !== 0xe0) continue;
+      const version = (bytes[i + 1]! >> 3) & 3;
+      const layer = (bytes[i + 1]! >> 1) & 3;
+      const bitrate = bytes[i + 2]! >> 4;
+      const rate = (bytes[i + 2]! >> 2) & 3;
+      if (version === 1 || layer === 0 || bitrate === 0 || bitrate === 15 || rate === 3) continue;
+      return RATES[version]![rate]!;
+    }
+    return null;
+  }
+  if (head === 'OggS') {
+    // Vorbis carries its rate in the identification packet; Opus always decodes at 48 kHz.
+    const text = String.fromCharCode(...bytes.subarray(0, Math.min(512, bytes.length)));
+    if (text.includes('OpusHead')) return 48000;
+    const at = text.indexOf('\x01vorbis');
+    if (at >= 0 && at + 16 <= buf.byteLength) return v.getUint32(at + 12, true) || null;
     return null;
   }
   if (head === 'fLaC' && buf.byteLength >= 22) {

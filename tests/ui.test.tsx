@@ -189,6 +189,36 @@ describe('library screen', () => {
     expect(within(row).getByText('MPC_SD_128')).toBeInTheDocument();
   });
 
+  it('finds a set of loops, splits, reverses and exports them as files', async () => {
+    mount();
+    const user = userEvent.setup();
+    const grid = await screen.findByRole('grid', { name: 'Samples' });
+    await user.click(await within(grid).findByRole('row', { name: /rhodes_loop_dusty_Am\.wav/ }));
+    await user.click(screen.getByRole('button', { name: 'Edit sample' }));
+    const editor = await screen.findByRole('region', { name: 'Sample editor' });
+    await within(editor).findByRole('img', { name: /Waveform of/ });
+
+    await user.click(within(editor).getByRole('button', { name: 'FIND LOOPS' }));
+    const panel = await within(editor).findByRole('region', { name: 'Found loops' });
+    await user.click(within(panel).getByRole('button', { name: '1' }));
+    await user.click(within(panel).getByRole('button', { name: 'SPLIT' }));
+    await waitFor(() => expect(within(panel).getAllByRole('listitem').length).toBeGreaterThanOrEqual(2));
+    const rows = within(panel).getAllByRole('listitem');
+
+    // Keep the first two, reverse the first, export.
+    for (const r of rows.slice(2)) await user.click(within(r).getByRole('checkbox'));
+    await user.click(within(rows[0]!).getByRole('button', { name: 'Reverse loop 1' }));
+    expect(within(panel).getByRole('button', { name: 'EXPORT 3 FILES' })).toBeEnabled();
+    await user.click(within(panel).getByRole('button', { name: 'EXPORT 3 FILES' }));
+    await waitFor(() => expect(within(editor).getByText(/EXPORTED 3 FILES BESIDE THE ORIGINAL/)).toBeInTheDocument());
+
+    await user.click(within(editor).getByRole('button', { name: 'LIBRARY' }));
+    const lib = screen.getByRole('grid', { name: 'Samples' });
+    expect(await within(lib).findByRole('row', { name: /rhodes_loop_dusty_loop01_1bar_Am\.wav/ })).toBeInTheDocument();
+    expect(within(lib).getByRole('row', { name: /rhodes_loop_dusty_loop01_1bar_rev_Am\.wav/ })).toBeInTheDocument();
+    expect(within(lib).getByRole('row', { name: /rhodes_loop_dusty_loop02_1bar_Am\.wav/ })).toBeInTheDocument();
+  });
+
   it('asks before throwing away edits', async () => {
     mount();
     const user = userEvent.setup();

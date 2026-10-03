@@ -1,4 +1,5 @@
 import { detectBpm, foldBpm, onsetEnvelope } from '../dsp/bpm';
+import { bpmFromName } from '../filename';
 import { nearestZeroCrossing } from './edit';
 import { frameCount, type PcmAudio } from './wav';
 
@@ -12,19 +13,22 @@ export interface LoopPick {
 
 const BEATS_PER_BAR = 4;
 
-function mixdown(a: PcmAudio): Float32Array {
+export function mixdown(a: PcmAudio): Float32Array {
   const n = frameCount(a);
   const out = new Float32Array(n);
   for (const ch of a.channels) for (let i = 0; i < n; i++) out[i] = out[i]! + ch[i]! / a.channels.length;
   return out;
 }
 
-/** The tempo to cut to: the one we already know, or a fresh detection on the first minute. */
-export function loopTempo(a: PcmAudio, known: number | null): number | null {
+/**
+ * The tempo to cut to: the one we already know, or a fresh detection on the first minute, settled by a tempo
+ * written in the file name ("123 BPM") when there is one.
+ */
+export function loopTempo(a: PcmAudio, known: number | null, name?: string): number | null {
   if (known) return known;
   const mono = mixdown(a);
   const head = mono.subarray(0, Math.min(mono.length, a.sampleRate * 60));
-  return foldBpm(detectBpm(head, a.sampleRate, head.length / a.sampleRate, null).bpm);
+  return foldBpm(detectBpm(head, a.sampleRate, head.length / a.sampleRate, name ? bpmFromName(name) : null).bpm);
 }
 
 /**
@@ -32,7 +36,7 @@ export function loopTempo(a: PcmAudio, known: number | null): number | null {
  * the block before it. That finds a kick even when a chord is already ringing underneath. Steps back one block so
  * the attack is kept whole.
  */
-function attackAt(x: Float32Array, from: number, span: number, sr: number): number {
+export function attackAt(x: Float32Array, from: number, span: number, sr: number): number {
   const blk = Math.max(8, Math.round(sr * 0.001));
   const end = Math.min(x.length, from + span);
   // Before the start of the file counts as silence, so a hit on sample 0 is found at 0.

@@ -142,8 +142,10 @@ export function detectBpm(x: Float32Array, sr: number, durationSec: number, hint
   conf *= gate;
 
   let bpm = bestBpm;
+  // A tempo in the file name settles octave errors and the 3:2 (triplet) confusion: the pulse at 2/3 or 3/2 of the
+  // real tempo is the commonest wrong answer on dense, swung or syncopated material.
   if (hint) {
-    for (const m of [1, 2, 0.5]) {
+    for (const m of [1, 2, 0.5, 1.5, 2 / 3, 3, 1 / 3]) {
       if (Math.abs(bpm * m - hint) / hint < 0.04) {
         return { bpm: hint, conf: Math.max(conf, 0.9) };
       }

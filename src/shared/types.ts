@@ -15,7 +15,7 @@ export interface Drive {
 
 export const LOCAL_DRIVE_ID = 'local';
 /** Bump when detector output changes: cached analyses with another version are thrown away and redone. */
-export const ANALYSIS_VERSION = 2;
+export const ANALYSIS_VERSION = 3;
 
 export interface Analysis {
   version: number;
