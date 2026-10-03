@@ -200,7 +200,8 @@ export function createMockApi(opts: MockOptions = {}): StacksApi {
     },
     reveal: () => undefined,
     startDrag: () => undefined,
-    pathForFile: (f) => f.name
+    pathForFile: (f) => f.name,
+    checkForUpdates: async () => 'Demo mode: updates only apply to an installed copy.'
   };
   return api;
 }

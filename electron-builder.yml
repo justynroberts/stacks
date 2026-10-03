@@ -1,13 +1,44 @@
+# Signing, notarising and publishing are driven by scripts/release.mjs. `npm run dist` builds and verifies
+# locally and never publishes (--publish never): the updater reads the latest public release, so a release is
+# the only thing that reaches people.
 appId: com.fintonlabs.stacks
 productName: Stacks
 directories:
   output: release
+  buildResources: build
 files:
   - out/**
   - package.json
+  - "!**/*.map"
+artifactName: ${productName}-${version}-${arch}.${ext}
 mac:
   category: public.app-category.music
-  target: [dmg]
+  icon: build/icon.png
+  target:
+    - target: dmg
+      arch: [universal]
+    # macOS applies updates from the zip, never the dmg.
+    - target: zip
+      arch: [universal]
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  notarize: false
+dmg:
+  # Versioned volume name: macOS refuses writes under a /Volumes/<name> an app was once launched from.
+  title: ${productName} ${version}
+  contents:
+    - { x: 140, y: 200, type: file }
+    - { x: 400, y: 200, type: link, path: /Applications }
+afterSign: scripts/notarize.cjs
+afterAllArtifactBuild: scripts/staple-dmg.cjs
+# The code repository is private; installers and the update manifest go to a public, binaries-only repo so
+# installed copies can see them.
+publish:
+  - provider: github
+    owner: justynroberts
+    repo: stacks-releases
 win:
   target: [nsis]
 linux:

@@ -6,6 +6,24 @@ packs or a download link on it and the key and BPM are read for you. Drag any ro
 Electron, React, TypeScript, Tailwind, Radix, Framer Motion. Design: a light DAW (Ableton and Pro Tools on warm
 paper), one typeface (Barlow Semi Condensed), one accent, dark theme as the alternative. See `DESIGN.md`.
 
+## Install
+
+Download the latest `.dmg` from **[stacks-releases](https://github.com/justynroberts/stacks-releases/releases/latest)**,
+open it and drag Stacks to Applications. It is signed and notarised, runs on Apple silicon and Intel, and updates
+itself: new versions download in the background and Stacks asks before restarting (About → Check for updates to
+look now). This source repository is private; installers live in that public, binaries-only repository.
+
+## Releasing
+
+```
+npm run release -- 0.3.0 --dry-run   # build universal, sign, notarise app and dmg, verify; publish nothing
+npm run release -- 0.3.0             # then commit the version, tag, and publish to stacks-releases
+```
+
+Notes go in `release-notes/<version>.md`. The script refuses a dirty tree, an existing version, a missing Developer
+ID or notary profile, failing tests, a stale update manifest, or anything Gatekeeper does not accept as a notarised
+Developer ID build. `npm run dist` builds locally and never publishes.
+
 ## Run it
 
 ```
@@ -14,7 +32,7 @@ npm run dev          # Electron with hot reload (renderer on port 5917)
 npm run dev:web      # the UI alone in a browser, with demo data (port 5917)
 ```
 
-Other scripts: `npm test`, `npm run typecheck`, `npm run build`, `npm run dist` (installers via electron-builder).
+Other scripts: `npm test`, `npm run typecheck`, `npm run build`.
 
 Docker is for the parts around the app (typecheck, tests, browser preview with demo data), not the app itself,
 because a container cannot see your USB ports or SD slot:
@@ -89,7 +107,6 @@ The library cache is one JSON file in the app's user data folder (`library.json`
 - Only the first 90 seconds of long files are analysed, and files over 400 MB are skipped.
 - Drive type (SD, SSD, HDD) comes from the OS (`lsblk` on Linux, `diskutil` on macOS, WMI on Windows) and falls
   back to "External". The macOS and Windows paths are written but have not been run on those systems.
-- Installers (`npm run dist`) are configured but untested here.
 
 ## Security notes
 

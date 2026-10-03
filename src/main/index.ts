@@ -2,6 +2,7 @@ import { join } from 'node:path';
 import { app, BrowserWindow, session, shell } from 'electron';
 import { broadcast, registerIpc } from './ipc';
 import { Services } from './services';
+import { setupUpdates } from './updater';
 
 const isDev = !app.isPackaged && !!process.env['ELECTRON_RENDERER_URL'];
 
@@ -59,6 +60,7 @@ app.whenReady().then(async () => {
   });
   registerIpc(services);
   createWindow();
+  setupUpdates();
   await services.start();
 
   app.on('activate', () => {

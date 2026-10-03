@@ -25,7 +25,8 @@ const api: StacksApi = {
   writeEdit: (id, wav, target) => ipcRenderer.invoke('file:writeEdit', id, wav, target),
   reveal: (id) => ipcRenderer.send('file:reveal', id),
   startDrag: (id) => ipcRenderer.send('file:drag', id),
-  pathForFile: (file) => webUtils.getPathForFile(file)
+  pathForFile: (file) => webUtils.getPathForFile(file),
+  checkForUpdates: () => ipcRenderer.invoke('app:checkUpdates')
 };
 
 contextBridge.exposeInMainWorld('stacks', api);

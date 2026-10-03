@@ -1,9 +1,18 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
+import { useStore } from '../store';
 import { version } from '../../../../package.json';
 import { Logo } from './Logo';
 
 export function AboutButton() {
   const dlg = useRef<HTMLDialogElement>(null);
+  const { api } = useStore();
+  const [update, setUpdate] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
+  const checkNow = async () => {
+    setChecking(true);
+    setUpdate(await api.checkForUpdates().catch((e: unknown) => `Could not check: ${String(e)}`));
+    setChecking(false);
+  };
   const open = () => {
     const d = dlg.current;
     if (!d) return;
@@ -50,8 +59,14 @@ export function AboutButton() {
             </a>
           </p>
         </div>
-        <div className="flex justify-end border-t border-line px-4 py-3">
-          <button type="button" onClick={close} className="h-8 border border-line-strong px-4 hover:bg-sel">Close</button>
+        <div className="border-t border-line px-4 py-3">
+          {update && <p role="status" className="mb-3 text-label tracking-normal text-muted">{update}</p>}
+          <div className="flex justify-between">
+            <button type="button" onClick={() => void checkNow()} disabled={checking} className="h-8 border border-line-strong px-3 hover:bg-sel">
+              {checking ? 'Checking…' : 'Check for updates'}
+            </button>
+            <button type="button" onClick={close} className="h-8 border border-line-strong px-4 hover:bg-sel">Close</button>
+          </div>
         </div>
       </dialog>
     </>

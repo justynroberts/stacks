@@ -93,6 +93,8 @@ export interface StacksApi {
   reveal(id: string): void;
   startDrag(id: string): void;
   pathForFile(file: File): string;
+  /** Check the releases repo now. Resolves to a line for the About panel. */
+  checkForUpdates(): Promise<string>;
 }
 
 export const AUDIO_EXTS = ['wav', 'aif', 'aiff', 'flac', 'mp3', 'ogg', 'm4a'] as const;

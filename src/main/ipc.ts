@@ -1,11 +1,13 @@
 import { BrowserWindow, ipcMain, nativeImage } from 'electron';
 import type { Analysis, EditTarget } from '@shared/types';
 import type { Services } from './services';
+import { checkForUpdatesNow } from './updater';
 
 // 32x32 neutral square; macOS refuses to start a drag without an icon.
 const dragIcon = () => nativeImage.createFromBitmap(Buffer.alloc(32 * 32 * 4, 0x88), { width: 32, height: 32 });
 
 export function registerIpc(svc: Services): void {
+  ipcMain.handle('app:checkUpdates', () => checkForUpdatesNow());
   ipcMain.handle('drives:list', () => svc.driveList());
   ipcMain.handle('samples:list', () => svc.library.all());
   ipcMain.handle('scan:drive', (_e, driveId: unknown) => {

@@ -100,6 +100,13 @@ Key invariants:
   the tokens in `styles.css` and enforces that split.
 - `npm ci` has been seen to skip Electron's binary download ("Electron uninstall" on launch). Fix with
   `node node_modules/electron/install.js`.
-- Local Mac app: `npm run build && CSC_IDENTITY_AUTO_DISCOVERY=false npx electron-builder --mac --dir`, then
-  `codesign --force --deep -s - release/mac-arm64/Stacks.app`. The icon comes from `build/icon.png` (rendered from
-  `build/icon.svg` with `rsvg-convert -w 1024 -h 1024`).
+- Quick local app (no notarising): `npm run build && CSC_IDENTITY_AUTO_DISCOVERY=false npx electron-builder --mac
+  --dir --arm64 -c.mac.target=dir`, then `codesign --force --deep -s - release/mac-arm64/Stacks.app`. The icon is
+  `build/icon.png` (rendered from `build/icon.svg` with `rsvg-convert -w 1024 -h 1024`).
+- **Releases** (`scripts/release.mjs`, `npm run release -- <ver> [--dry-run]`) are cut locally, never in CI, and only
+  when the user asks in that message. Universal dmg + zip, hardened runtime (`build/entitlements.mac.plist`), app
+  notarised in `scripts/notarize.cjs` (afterSign), dmg signed → notarised → stapled in `scripts/staple-dmg.cjs`, then
+  `scripts/fix-update-metadata.mjs` re-hashes `latest-mac.yml` (stapling rewrites the dmg). The code repo is private,
+  so artifacts publish to the public **justynroberts/stacks-releases**, which `electron-builder.yml` → `publish` and
+  `src/main/updater.ts` (electron-updater, DemoDog's pattern: background download, ask before restart, log to
+  `updater.log`) both point at. Ship the zip: macOS installs updates from it, never the dmg.
