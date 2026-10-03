@@ -127,10 +127,19 @@ describe('filenames', () => {
     expect(bpmFromName('hat_closed_tight_12.wav')).toBeNull();
   });
   it('builds the tagged name and stays idempotent', () => {
-    expect(buildName('rhodes_loop_dusty_Am.wav', 84, 'Am')).toBe('084_Am_rhodes_loop_dusty.wav');
-    expect(buildName('084_Am_rhodes_loop_dusty.wav', 84, 'Am')).toBe('084_Am_rhodes_loop_dusty.wav');
-    expect(buildName('808_sub_glide_F.wav', null, 'F')).toBe('F_808_sub_glide.wav');
+    // Tags go at the end, so the name still sorts where it did.
+    expect(buildName('rhodes_loop_dusty_Am.wav', 84, 'Am')).toBe('rhodes_loop_dusty_Am_84bpm.wav');
+    expect(buildName('rhodes_loop_dusty_Am_84bpm.wav', 84, 'Am')).toBe('rhodes_loop_dusty_Am_84bpm.wav');
+    expect(buildName('808_sub_glide_F.wav', null, 'F')).toBe('808_sub_glide_F.wav');
+    expect(buildName('bass_reese_loop_140.wav', 140, 'Gm')).toBe('bass_reese_loop_Gm_140bpm.wav');
+    expect(buildName('amen_break_172.wav', 86, null)).toBe('amen_break_86bpm.wav');
+    expect(buildName('kick_01.wav', 120, null)).toBe('kick_01_120bpm.wav');
     expect(buildName('hat.wav', null, null)).toBeNull();
-    expect(cleanBase('bass_reese_loop_140.wav')).toBe('bass_reese_loop');
+    // Names from the older prefix format are moved over.
+    expect(buildName('084_Am_rhodes_loop_dusty.wav', 84, 'Am')).toBe('rhodes_loop_dusty_Am_84bpm.wav');
+    expect(buildName('F_808_sub_glide.wav', null, 'F')).toBe('808_sub_glide_F.wav');
+    expect(buildName('120_drums_tight.wav', 120, null)).toBe('drums_tight_120bpm.wav');
+    expect(cleanBase('bass_reese_loop_140.wav', 140)).toBe('bass_reese_loop');
+    expect(cleanBase('kick_01.wav', 120)).toBe('kick_01');
   });
 });

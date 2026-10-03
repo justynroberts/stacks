@@ -39,7 +39,7 @@ docker compose up --build        # http://localhost:5918
   70 is doubled, so a 172 break reads 86 (even when "172" is in its name).
 - **Mixes with**: shows the Camelot neighbours of the selected sample, and can filter the list to what mixes
   (compatible key, tempo within 6%).
-- **Rename**: `084_Am_rhodes_loop_dusty.wav`, on disk, never overwriting (a clash gets `_2`). Idempotent.
+- **Rename**: `rhodes_loop_dusty_Am_84bpm.wav` (key and tempo at the end, so sort order never changes), on disk, never overwriting (a clash gets `_2`). Idempotent.
 - **Copy to drive**: into a `Stacks` folder on the target, never overwriting.
 - **Drag out**: drag a row into Ableton, Finder, anything that accepts a file drag.
 - **Keyboard**: arrows, Home/End, Page up/down move; Space previews; click a column header to sort.

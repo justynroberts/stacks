@@ -31,7 +31,7 @@ describe('library screen', () => {
     await user.click(await within(grid).findByRole('row', { name: /rhodes_loop_dusty_Am\.wav/ }));
     const panel = screen.getByRole('region', { name: 'Selected sample' });
     expect(within(panel).getByRole('heading', { name: 'rhodes_loop_dusty_Am.wav' })).toBeInTheDocument();
-    expect(within(panel).getByText('084_Am_rhodes_loop_dusty.wav')).toBeInTheDocument();
+    expect(within(panel).getByText('rhodes_loop_dusty_Am_84bpm.wav')).toBeInTheDocument();
     expect(within(panel).getByRole('img', { name: /Compatible keys: .*8A.*7A.*9A.*8B|Compatible keys/ })).toBeInTheDocument();
   });
 
@@ -41,7 +41,7 @@ describe('library screen', () => {
     const grid = await screen.findByRole('grid', { name: 'Samples' });
     await user.click(await within(grid).findByRole('row', { name: /rhodes_loop_dusty_Am\.wav/ }));
     await user.click(screen.getByRole('button', { name: 'Rename with key + BPM' }));
-    expect(await within(grid).findByRole('row', { name: /084_Am_rhodes_loop_dusty\.wav/ })).toBeInTheDocument();
+    expect(await within(grid).findByRole('row', { name: /rhodes_loop_dusty_Am_84bpm\.wav/ })).toBeInTheDocument();
   });
 
   it('filters by search and by drive', async () => {

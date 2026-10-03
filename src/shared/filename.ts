@@ -26,28 +26,36 @@ export function bpmFromName(name: string): number | null {
   return null;
 }
 
-/** The descriptive part of a name, with any BPM / key tags we (or the pack) added removed. */
-export function cleanBase(name: string): string {
+/** Within 4% of the tempo, or of double or half it (tempos are folded, so a "172" in the name can mean 86). */
+const nearTempo = (v: number, bpm: number): boolean => [bpm, bpm * 2, bpm / 2].some((t) => Math.abs(v - t) / t < 0.04);
+
+/**
+ * The descriptive part of a name, with key and tempo tags removed: ours ("_Am_84bpm" at the end, or the older
+ * "084_Am_" prefix) and the pack's own. A bare trailing number only counts as a tempo when it matches `bpm`,
+ * so "kick_01" keeps its number.
+ */
+export function cleanBase(name: string, bpm: number | null = null, keyShort: string | null = null): string {
   let { base } = splitName(name);
-  // We always write the tempo as three digits (050..220), so only that shape counts as ours.
-  base = base.replace(/^(?:0[5-9]\d|1\d\d|2[01]\d|220)_(?:[A-G](?:#|b)?m?_)?/, '');
+  base = base.replace(/^(?:0[5-9]\d|1\d\d|2[01]\d|220)_[A-G](?:#|b)?m?_/, '').replace(/^0[5-9]\d_/, '');
+  const lead = /^(\d{3})_/.exec(base);
+  if (lead && bpm && nearTempo(Number(lead[1]), bpm)) base = base.slice(lead[0].length);
+  if (keyShort && base.startsWith(`${keyShort}_`)) base = base.slice(keyShort.length + 1);
   const parts = base.split('_');
   while (parts.length > 1) {
     const last = parts[parts.length - 1]!;
-    if (KEY_TOKEN.test(last) || /^\d{2,3}(bpm)?$/i.test(last)) parts.pop();
+    const bare = /^\d{2,3}$/.test(last) && bpm !== null && nearTempo(Number(last), bpm);
+    if (KEY_TOKEN.test(last) || /^\d{2,3}bpm$/i.test(last) || bare) parts.pop();
     else break;
   }
   return parts.join('_');
 }
 
+/** "rhodes_loop_dusty.wav" -> "rhodes_loop_dusty_Am_84bpm.wav". Tags go at the end so sort order never changes. */
 export function buildName(name: string, bpm: number | null, keyShort: string | null): string | null {
   if (!bpm && !keyShort) return null;
   const { ext } = splitName(name);
-  const bits: string[] = [];
-  if (bpm) bits.push(String(Math.round(bpm)).padStart(3, '0'));
+  const bits = [cleanBase(name, bpm, keyShort)];
   if (keyShort) bits.push(keyShort);
-  const prefix = bits.join('_');
-  if (splitName(name).base.startsWith(prefix + '_')) return name;
-  bits.push(cleanBase(name));
+  if (bpm) bits.push(`${Math.round(bpm)}bpm`);
   return `${bits.join('_')}${ext ? '.' + ext : ''}`;
 }
