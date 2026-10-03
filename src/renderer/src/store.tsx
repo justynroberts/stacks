@@ -1,12 +1,22 @@
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import type { Analysis, Drive, QueueItem, Sample, StacksApi } from '@shared/types';
+import { frameCount } from '@shared/audio/wav';
+import type { Analysis, Drive, EditTarget, QueueItem, Sample, StacksApi } from '@shared/types';
 import { AnalysisRunner, type RunState } from './analysis/runner';
 import { createAnalysisWorker } from './analysis/createWorker';
+import { decodeForEdit } from './editor/load';
+import { Player } from './editor/player';
 import { applyFilters, defaultFilters, type Filters, type Sort, sortSamples } from './filters';
 
-const MIME: Record<string, string> = { wav: 'audio/wav', aif: 'audio/aiff', aiff: 'audio/aiff', flac: 'audio/flac', mp3: 'audio/mpeg', ogg: 'audio/ogg', m4a: 'audio/mp4' };
-
-export interface Preview { playingId: string | null; progress: number; toggle(id: string): void; stop(): void }
+export interface Preview {
+  playingId: string | null;
+  /** 0..1 through the file. */
+  progress: number;
+  /** Loop the whole sample, gaplessly, to hear whether the seam clicks. */
+  loop: boolean;
+  setLoop(on: boolean): void;
+  toggle(id: string): void;
+  stop(): void;
+}
 
 export interface Store {
   api: StacksApi;
@@ -33,6 +43,12 @@ export interface Store {
   copy(id: string, driveId: string): Promise<void>;
   importUrl(url: string): Promise<boolean>;
   setExcluded(driveId: string, excluded: boolean): Promise<void>;
+  /** The sample open in the editor, if any. */
+  editing: Sample | undefined;
+  openEditor(id: string): void;
+  closeEditor(): void;
+  /** Returns the saved sample, or null after showing the error. */
+  saveEdit(id: string, wav: ArrayBuffer, target: EditTarget): Promise<Sample | null>;
 }
 
 const Ctx = createContext<Store | null>(null);
@@ -43,44 +59,71 @@ export function useStore(): Store {
   return s;
 }
 
+/**
+ * Library preview. Uses the editor's Web Audio player rather than an <audio> element, because a media element
+ * leaves a gap when it loops (and MP3 adds encoder padding), which would hide or fake a click at the seam.
+ */
 function usePreview(api: StacksApi, byId: (id: string) => Sample | undefined): Preview {
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
-  const audio = useRef<HTMLAudioElement | null>(null);
-  const url = useRef<string | null>(null);
+  const [loop, setLoopState] = useState(false);
+  const player = useRef<Player | null>(null);
+  const current = useRef<{ id: string; frames: number } | null>(null);
+  const request = useRef(0);
+  const loopRef = useRef(loop);
+  loopRef.current = loop;
 
   const stop = useCallback(() => {
-    audio.current?.pause();
-    audio.current = null;
-    if (url.current) URL.revokeObjectURL(url.current);
-    url.current = null;
+    request.current++;
+    player.current?.stop();
+    current.current = null;
     setPlayingId(null);
     setProgress(0);
   }, []);
 
   const toggle = useCallback(
     (id: string) => {
-      if (audio.current && playingId === id) return stop();
+      if (playingId === id) return stop();
       stop();
-      const s = byId(id);
-      if (!s) return;
-      void api.readFile(id).then((bytes) => {
-        const blob = new Blob([bytes], { type: MIME[s.ext] ?? 'audio/wav' });
-        const src = URL.createObjectURL(blob);
-        const el = new Audio(src);
-        url.current = src;
-        audio.current = el;
-        el.ontimeupdate = () => setProgress(el.duration ? el.currentTime / el.duration : 0);
-        el.onended = () => stop();
+      if (!byId(id)) return;
+      const mine = ++request.current;
+      void api.readFile(id).then(decodeForEdit).then(({ audio }) => {
+        if (mine !== request.current) return; // something else was asked for meanwhile
+        const p = (player.current ??= new Player());
+        const frames = frameCount(audio);
+        p.play(audio, 0, frames, loopRef.current, () => {
+          if (current.current?.id !== id) return;
+          current.current = null;
+          setPlayingId(null);
+          setProgress(0);
+        });
+        if (!p.playing) return;
+        current.current = { id, frames };
         setPlayingId(id);
-        void el.play().catch(() => stop());
       }, () => undefined);
     },
     [api, byId, playingId, stop]
   );
 
-  useEffect(() => stop, [stop]);
-  return { playingId, progress, toggle, stop };
+  const setLoop = useCallback((on: boolean) => {
+    setLoopState(on);
+    const c = current.current;
+    if (c) player.current?.setLooping(on, 0, c.frames);
+  }, []);
+
+  // A few updates a second is plenty for the waveform playhead, and keeps the whole tree from re-rendering per frame.
+  useEffect(() => {
+    if (!playingId) return;
+    const t = setInterval(() => {
+      const c = current.current;
+      const pos = player.current?.position();
+      if (c && pos != null) setProgress(pos / Math.max(1, c.frames));
+    }, 66);
+    return () => clearInterval(t);
+  }, [playingId]);
+
+  useEffect(() => () => { player.current?.dispose(); }, []);
+  return { playingId, progress, loop, setLoop, toggle, stop };
 }
 
 export function StoreProvider({ api, demo, createWorker, children }: { api: StacksApi; demo: boolean; createWorker?: () => Worker; children: ReactNode }) {
@@ -100,6 +143,7 @@ export function StoreProvider({ api, demo, createWorker, children }: { api: Stac
   const [filters, setFiltersState] = useState<Filters>(defaultFilters);
   const [sort, setSort] = useState<Sort>({ key: 'name', dir: 'asc' });
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [notice, setNoticeState] = useState<Store['notice']>(null);
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [, setRunRev] = useState(0);
@@ -218,6 +262,24 @@ export function StoreProvider({ api, demo, createWorker, children }: { api: Stac
     if (filters.drive !== 'all' && drives.some((d) => d.id === filters.drive && d.excluded)) setFiltersState((f) => ({ ...f, drive: 'all' }));
   }, [drives, filters.drive]);
 
+  const openEditor = useCallback((id: string) => {
+    preview.stop();
+    setSelectedId(id);
+    setEditingId(id);
+  }, [preview]);
+  const closeEditor = useCallback(() => setEditingId(null), []);
+  const saveEdit = useCallback(async (id: string, wav: ArrayBuffer, target: EditTarget) => {
+    const r = await api.writeEdit(id, wav, target);
+    if (!r.ok) { setNotice(r.error, true); return null; }
+    // Show the result straight away; the library event that follows carries the same entry.
+    map.current.set(r.value.id, r.value);
+    flush();
+    const where = target.kind === 'new' && target.driveId ? ` to ${driveNames.get(target.driveId) ?? 'drive'} / Stacks` : '';
+    setNotice(target.kind === 'replace' ? `Replaced ${r.value.name}. The original is in the Trash.` : `Saved ${r.value.name}${where}`);
+    return r.value;
+  }, [api, flush, setNotice, driveNames]);
+  const editing = editingId ? byId(editingId) : undefined;
+
   const counts = runner.current?.counts ?? { queued: 0, running: 0 };
   const analysisCounts = { ...counts, done: samples.reduce((n, s) => n + (s.analysis ? 1 : 0), 0), total: samples.length };
 
@@ -225,7 +287,7 @@ export function StoreProvider({ api, demo, createWorker, children }: { api: Stac
     api, demo, drives, mounted: drives.filter((d) => d.mounted && !d.excluded && d.id !== 'local'), samples, visible, selected, select,
     filters, setFilters: (patch) => setFiltersState((f) => ({ ...f, ...patch })), sort, setSort,
     queue, runState: runner.current?.state ?? new Map(), analysisCounts, driveNames, perDrive, totals, preview, notice,
-    rename, copy, importUrl, setExcluded
+    rename, copy, importUrl, setExcluded, editing, openEditor, closeEditor, saveEdit
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

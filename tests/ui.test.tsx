@@ -129,6 +129,95 @@ describe('library screen', () => {
     expect(screen.queryByRole('region', { name: 'Excluded drives' })).toBeNull();
   });
 
+  it('opens the editor, edits, and saves a copy next to the original', async () => {
+    mount();
+    const user = userEvent.setup();
+    const grid = await screen.findByRole('grid', { name: 'Samples' });
+    await user.click(await within(grid).findByRole('row', { name: /rhodes_loop_dusty_Am\.wav/ }));
+    await user.click(screen.getByRole('button', { name: 'Edit sample' }));
+    const editor = await screen.findByRole('region', { name: 'Sample editor' });
+    await within(editor).findByRole('img', { name: /Waveform of rhodes_loop_dusty_Am\.wav, mono/ });
+
+    const save = within(editor).getByRole('button', { name: 'SAVE AS COPY' });
+    expect(save).toBeDisabled();
+    expect(within(editor).getByRole('button', { name: 'TRIM' })).toBeDisabled();
+
+    // Type a selection, then trim to it.
+    const start = within(editor).getByRole('textbox', { name: 'Selection start' });
+    const end = within(editor).getByRole('textbox', { name: 'Selection end' });
+    await user.clear(end); await user.type(end, '0:02.000{Enter}');
+    await user.clear(start); await user.type(start, '0:01.000{Enter}');
+    await user.click(within(editor).getByRole('button', { name: 'TRIM' }));
+    expect(within(editor).getByText(/EDITED · 1 CHANGE/)).toBeInTheDocument();
+    await user.click(within(editor).getByRole('button', { name: 'UNDO' }));
+    expect(within(editor).queryByText(/EDITED/)).toBeNull();
+    await user.click(within(editor).getByRole('button', { name: 'REDO' }));
+    await user.click(within(editor).getByRole('button', { name: 'NORMALIZE' }));
+    expect(within(editor).getByText(/EDITED · 2 CHANGES/)).toBeInTheDocument();
+
+    await user.click(within(editor).getByRole('button', { name: 'SAVE AS COPY' }));
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Sample editor' })).toBeNull());
+    expect(await within(screen.getByRole('grid', { name: 'Samples' })).findByRole('row', { name: /rhodes_loop_dusty_edit_Am\.wav/ })).toBeInTheDocument();
+    expect(within(screen.getByRole('grid', { name: 'Samples' })).getByRole('row', { name: /rhodes_loop_dusty_Am\.wav/ })).toBeInTheDocument();
+  });
+
+  it('auto-loops and saves just the loop to another drive, staying in the editor', async () => {
+    mount();
+    const user = userEvent.setup();
+    const grid = await screen.findByRole('grid', { name: 'Samples' });
+    await user.click(await within(grid).findByRole('row', { name: /rhodes_loop_dusty_Am\.wav/ }));
+    await user.click(screen.getByRole('button', { name: 'Edit sample' }));
+    const editor = await screen.findByRole('region', { name: 'Sample editor' });
+    await within(editor).findByRole('img', { name: /Waveform of/ });
+    expect(within(editor).getByRole('button', { name: 'SAVE LOOP' })).toBeDisabled();
+
+    await user.click(within(editor).getByRole('button', { name: 'AUTO LOOP' }));
+    expect(within(editor).getByRole('button', { name: /^AUTO LOOP 1\/\d+$/ })).toBeInTheDocument();
+    expect(within(editor).getByRole('button', { name: 'LOOP' })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(editor).getByText(/2 BARS · CANDIDATE 1 OF/)).toBeInTheDocument();
+    await user.click(within(editor).getByRole('button', { name: /^AUTO LOOP 1\// }));
+    expect(within(editor).getByRole('button', { name: /^AUTO LOOP 2\// })).toBeInTheDocument();
+    await user.click(within(editor).getByRole('button', { name: '1 BAR' }));
+
+    await user.selectOptions(within(editor).getByRole('combobox', { name: 'Save new files to' }), 'MPC_SD_128 / Stacks');
+    await user.click(within(editor).getByRole('button', { name: 'SAVE LOOP' }));
+    await waitFor(() => expect(screen.getByText(/Saved rhodes_loop_dusty_loop_1bar_Am\.wav to MPC_SD_128 \/ Stacks/)).toBeInTheDocument());
+    expect(screen.getByRole('region', { name: 'Sample editor' })).toBeInTheDocument();
+
+    await user.click(within(editor).getByRole('button', { name: 'LIBRARY' }));
+    const row = await within(screen.getByRole('grid', { name: 'Samples' })).findByRole('row', { name: /rhodes_loop_dusty_loop_1bar_Am\.wav/ });
+    expect(within(row).getByText('MPC_SD_128')).toBeInTheDocument();
+  });
+
+  it('asks before throwing away edits', async () => {
+    mount();
+    const user = userEvent.setup();
+    const grid = await screen.findByRole('grid', { name: 'Samples' });
+    await user.click(await within(grid).findByRole('row', { name: /rhodes_loop_dusty_Am\.wav/ }));
+    await user.click(screen.getByRole('button', { name: 'Edit sample' }));
+    const editor = await screen.findByRole('region', { name: 'Sample editor' });
+    await within(editor).findByRole('img', { name: /Waveform of/ });
+    await user.click(within(editor).getByRole('button', { name: 'REVERSE' }));
+    await user.click(within(editor).getByRole('button', { name: 'LIBRARY' }));
+    expect(screen.getByRole('region', { name: 'Sample editor' })).toBeInTheDocument();
+    await user.click(within(editor).getByRole('button', { name: 'DISCARD EDITS?' }));
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Sample editor' })).toBeNull());
+  });
+
+  it('loops the preview from the clip view or with L', async () => {
+    mount();
+    const user = userEvent.setup();
+    const grid = await screen.findByRole('grid', { name: 'Samples' });
+    await user.click(await within(grid).findByRole('row', { name: /rhodes_loop_dusty_Am\.wav/ }));
+    const toggle = screen.getByRole('button', { name: 'LOOP · L' });
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    grid.focus();
+    await user.keyboard('l');
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+  });
+
   it('has an about button crediting FintonLabs', async () => {
     mount();
     await screen.findByRole('grid', { name: 'Samples' });

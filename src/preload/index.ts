@@ -22,6 +22,7 @@ const api: StacksApi = {
   saveAnalysis: (id, a: Analysis) => ipcRenderer.invoke('analysis:save', id, a),
   renameWithMeta: (id) => ipcRenderer.invoke('file:rename', id),
   copyToDrive: (id, driveId) => ipcRenderer.invoke('file:copy', id, driveId),
+  writeEdit: (id, wav, target) => ipcRenderer.invoke('file:writeEdit', id, wav, target),
   reveal: (id) => ipcRenderer.send('file:reveal', id),
   startDrag: (id) => ipcRenderer.send('file:drag', id),
   pathForFile: (file) => webUtils.getPathForFile(file)

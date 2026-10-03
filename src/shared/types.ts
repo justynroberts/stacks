@@ -64,6 +64,13 @@ export interface QueueItem {
   error?: string;
 }
 
+/**
+ * Where edited audio goes. 'replace' swaps it in for the original (which goes to the Trash). 'new' writes a new file
+ * named with `label` ("edit", "loop_2bar"): beside the original when driveId is null, otherwise into a Stacks folder
+ * on that drive.
+ */
+export type EditTarget = { kind: 'replace' } | { kind: 'new'; driveId: string | null; label: string };
+
 export type Result<T> = { ok: true; value: T } | { ok: false; error: string };
 
 export interface StacksApi {
@@ -81,6 +88,8 @@ export interface StacksApi {
   saveAnalysis(id: string, analysis: Analysis): Promise<void>;
   renameWithMeta(id: string): Promise<Result<Sample>>;
   copyToDrive(id: string, driveId: string): Promise<Result<Sample>>;
+  /** Save edited audio (a WAV file) for sample `id`. A non-WAV original replaced this way becomes .wav. */
+  writeEdit(id: string, wav: ArrayBuffer, target: EditTarget): Promise<Result<Sample>>;
   reveal(id: string): void;
   startDrag(id: string): void;
   pathForFile(file: File): string;

@@ -4,8 +4,8 @@ import { Readable, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import type { ReadableStream as WebReadable } from 'node:stream/web';
 import { app, net, shell } from 'electron';
-import { buildName } from '@shared/filename';
-import { type Analysis, type Drive, isAudioExt, LOCAL_DRIVE_ID, type QueueItem, type Result, type Sample } from '@shared/types';
+import { buildName, editName } from '@shared/filename';
+import { type Analysis, type Drive, type EditTarget, isAudioExt, LOCAL_DRIVE_ID, type QueueItem, type Result, type Sample } from '@shared/types';
 import { DriveWatcher, localDrive } from './drives';
 import { Library, sampleId } from './library';
 import { JobQueue } from './queue';
@@ -14,6 +14,14 @@ import { extractAudio } from './unzip';
 
 const MAX_READ = 400 * 1024 * 1024;
 const MAX_DOWNLOAD = 2 * 1024 * 1024 * 1024;
+const MAX_EDIT = 1024 * 1024 * 1024;
+
+/** The page sends an ArrayBuffer; only accept something that at least looks like a WAV file. */
+function wavBytes(x: unknown): Buffer | null {
+  const b = x instanceof ArrayBuffer ? Buffer.from(x) : x instanceof Uint8Array ? Buffer.from(x.buffer, x.byteOffset, x.byteLength) : null;
+  if (!b || b.length < 44 || b.length > MAX_EDIT) return null;
+  return b.toString('latin1', 0, 4) === 'RIFF' && b.toString('latin1', 8, 12) === 'WAVE' ? b : null;
+}
 
 export interface Emit {
   drives(d: Drive[]): void;
@@ -273,6 +281,56 @@ export class Services {
       return { ok: true, value: moved };
     } catch (e) {
       return { ok: false, error: e instanceof Error ? e.message : String(e) };
+    }
+  }
+
+  async writeEdit(id: string, wav: unknown, target: EditTarget): Promise<Result<Sample>> {
+    const stored = this.library.get(id);
+    const abs = this.absFor(id);
+    if (!stored || !abs) return { ok: false, error: 'Drive is not connected' };
+    const bytes = wavBytes(wav);
+    if (!bytes) return { ok: false, error: 'The edit did not produce a valid WAV file' };
+    const dir = path.dirname(abs);
+    const indexed = async (dest: string): Promise<Result<Sample>> => {
+      const st = await fs.stat(dest);
+      const [changed] = this.ingest([{ abs: dest, size: st.size, mtimeMs: st.mtimeMs }]);
+      const sample = changed ?? this.library.all().find((s) => s.path === dest);
+      return sample ? { ok: true, value: sample } : { ok: false, error: 'Saved, but the file was not indexed. Rescan the drive.' };
+    };
+    try {
+      if (target.kind === 'new') {
+        let into = dir;
+        if (target.driveId !== null) {
+          const d = this.watcher.drives.find((x) => x.id === target.driveId);
+          if (!d || this.library.isExcluded(d.id)) return { ok: false, error: 'That drive is not connected' };
+          into = path.join(d.mount, 'Stacks');
+          await fs.mkdir(into, { recursive: true });
+        }
+        const a = stored.analysis;
+        const dest = await uniquePath(path.join(into, editName(path.basename(abs), a?.bpm ?? null, a?.keyShort ?? null, target.label)));
+        await fs.writeFile(dest, bytes, { flag: 'wx' });
+        return await indexed(dest);
+      }
+      // Replace: write beside the original first (hidden, so a scan never picks it up), then trash, then swap in.
+      const { name, ext } = path.parse(abs);
+      const tmp = path.join(dir, `.${name}.stacks-edit.tmp`);
+      await fs.writeFile(tmp, bytes);
+      try {
+        await shell.trashItem(abs);
+      } catch (e) {
+        await fs.rm(tmp, { force: true });
+        return { ok: false, error: `Could not move the original to the Trash, so nothing was replaced (${e instanceof Error ? e.message : e})` };
+      }
+      const dest = ext.toLowerCase() === '.wav' ? abs : await uniquePath(path.join(dir, `${name}.wav`));
+      await fs.rename(tmp, dest);
+      if (dest !== abs) {
+        this.library.remove([id]);
+        this.emit.samples([], [id]);
+      }
+      return await indexed(dest);
+    } catch (e) {
+      const err = e as NodeJS.ErrnoException;
+      return { ok: false, error: err.code === 'ENOSPC' ? 'Not enough space on the drive' : err.message };
     }
   }
 

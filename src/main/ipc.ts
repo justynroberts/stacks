@@ -1,5 +1,5 @@
 import { BrowserWindow, ipcMain, nativeImage } from 'electron';
-import type { Analysis } from '@shared/types';
+import type { Analysis, EditTarget } from '@shared/types';
 import type { Services } from './services';
 
 // 32x32 neutral square; macOS refuses to start a drag without an icon.
@@ -22,6 +22,14 @@ export function registerIpc(svc: Services): void {
   ipcMain.handle('analysis:save', (_e, id: unknown, a: unknown) => svc.saveAnalysis(String(id), a as Analysis));
   ipcMain.handle('file:rename', (_e, id: unknown) => svc.renameWithMeta(String(id)));
   ipcMain.handle('file:copy', (_e, id: unknown, driveId: unknown) => svc.copyToDrive(String(id), String(driveId)));
+  ipcMain.handle('file:writeEdit', (_e, id: unknown, wav: unknown, target: unknown) => {
+    const t = target as Partial<EditTarget> | null;
+    if (t?.kind === 'replace') return svc.writeEdit(String(id), wav, { kind: 'replace' });
+    if (t?.kind === 'new' && (t.driveId === null || typeof t.driveId === 'string') && typeof t.label === 'string' && /^[a-z0-9]+(?:_[a-z0-9]+)*$/.test(t.label) && t.label.length <= 24) {
+      return svc.writeEdit(String(id), wav, { kind: 'new', driveId: t.driveId, label: t.label });
+    }
+    return { ok: false, error: 'Bad save target' };
+  });
   ipcMain.on('file:reveal', (_e, id: unknown) => svc.reveal(String(id)));
   ipcMain.on('file:drag', (e, id: unknown) => {
     const file = svc.pathForDrag(String(id));

@@ -40,9 +40,28 @@ docker compose up --build        # http://localhost:5918
 - **Mixes with**: shows the Camelot neighbours of the selected sample, and can filter the list to what mixes
   (compatible key, tempo within 6%).
 - **Rename**: `rhodes_loop_dusty_Am_84bpm.wav` (key and tempo at the end, so sort order never changes), on disk, never overwriting (a clash gets `_2`). Idempotent.
+- **Edit**: press E (or Edit sample) for a waveform editor. Drag to select (edges snap to zero crossings, or to
+  16ths at the sample's tempo; hold Alt to bypass), then trim, delete, silence, trim silence, fade in/out, de-click,
+  ±3 dB, normalise or reverse. Undo/redo, zoom (pinch, Ctrl/Cmd+scroll, +/-, 0 to fit), selection playback with loop,
+  and typed start/end times. WAV is edited at its own rate and bit depth; other formats are decoded at their own rate
+  and saved as 24-bit WAV. **Save as copy** writes `name_edit.wav`; **Replace original** needs a second click and
+  moves the original to the Trash. Keys: Space play, L loop, Cmd+A all, Cmd+T trim, Backspace delete,
+  Cmd+Z / Shift+Cmd+Z, Cmd+S save copy, Shift+Cmd+S save loop, Esc back.
+- **Loops**: **Auto loop** picks the best 4, 2 or 1 bar loop (beat grid on the hits, starting on a transient, a clean
+  wrap at the seam, edges on zero crossings) and turns looping on; press again for the next candidate. With no tempo
+  in the analysis it detects one. **1 bar / 2 / 4** select that many bars from the cursor. **Save loop** writes just
+  the selection as `name_loop_2bar.wav` (bar count when it is a whole number of bars). **Save to** sends new files
+  beside the original or into a `Stacks` folder on any connected drive; the editor stays open for the next loop.
+  While a loop plays you can drag its edges, retype them, or auto-loop again: the pass that is playing finishes, and
+  the next pass uses the new points (moving the loop elsewhere jumps there, it never plays the gap). Loop can also be
+  switched on or off mid-play without restarting.
 - **Copy to drive**: into a `Stacks` folder on the target, never overwriting.
 - **Drag out**: drag a row into Ableton, Finder, anything that accepts a file drag.
-- **Keyboard**: arrows, Home/End, Page up/down move; Space previews; click a column header to sort.
+- **Keyboard**: arrows, Home/End, Page up/down move; Space previews; L loops the preview; E opens the editor; click a
+  column header to sort.
+- **Loop preview**: LOOP in the clip view (or L) loops the whole sample gaplessly through Web Audio, so a click or a
+  bad tail at the seam is audible before you open the editor. It stays on as you move between samples and can be
+  switched mid-play without restarting.
 - 30,000 samples stay smooth (virtual list; about a second to load, 28 rows in the DOM).
 
 ## Layout
@@ -63,6 +82,8 @@ The library cache is one JSON file in the app's user data folder (`library.json`
   not on a corpus of real music. Expect good results on clear loops and chord stabs, and mistakes on dense mixes,
   heavy swing, key changes, and tempo octaves with no hint in the name. The confidence figure is a rough guide.
   Treat Camelot codes as a starting point and trust your ears.
+- **Edits drop extra WAV chunks** (cue points, loop markers, ACID / BWF metadata): the editor writes plain audio.
+  Fades are linear, and there is no dither when going down to 16-bit.
 - **Rename only changes the file name.** It does not write BPM or key tags inside the file yet.
 - **Links must be direct** (a file or a zip). Pages that sit behind a login or a download button will not work.
 - Only the first 90 seconds of long files are analysed, and files over 400 MB are skipped.

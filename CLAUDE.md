@@ -44,6 +44,20 @@ filters, sort, preview playback and the `AnalysisRunner`.
 decodes with Web Audio (`decode.ts`), posts mono samples to an inline worker (`analysis.worker.ts`) that calls
 `analyse()` from `src/shared/dsp`, then sends the result back with `saveAnalysis`. Main caches it on the sample.
 
+**Editor (`src/renderer/src/editor`)** — opened by `store.openEditor`; replaces the list and clip view in `App`.
+WAV is decoded by `shared/audio/wav.ts` (exact, native rate and depth); other formats by Web Audio at the rate
+`sniffSampleRate` reads from the header. Edits are pure functions in `shared/audio/edit.ts` that return new audio,
+so undo is a stack of snapshots (capped by bytes). Auto loop is `shared/audio/loop.ts` (`findLoops`, ranked; onset
+envelope frame i is a 4-hop window, so a hit at frame f peaks near index f/hop − 2 — keep that offset).
+`editor/player.ts` plays a loop as a chain of one-pass sources scheduled sample-accurately ~250 ms ahead (not a
+single looping source), so moved loop points apply from the next pass; `tests/player.test.ts` drives it with a fake
+clock (`new Player(fakeCtx, false)` + `tick()`). Drawing is canvas (`WaveView`, `Overview`) over a min/max
+summary (`peaks.ts`); colours come from the CSS tokens at draw time. Saving encodes with `writeWav` in the source's
+format and calls `api.writeEdit` with an `EditTarget`: `{ kind: 'new', driveId, label }` → `editName(…, label)` beside
+the original (driveId null) or in `<drive>/Stacks`; `{ kind: 'replace' }` → hidden temp file, original to the Trash
+via `shell.trashItem`, then swap in (same library id when the original was already .wav). `ipc.ts` validates the
+target and restricts `label` to `[a-z0-9_]`, since it becomes part of a file name.
+
 **Shared (`src/shared`)** — pure TypeScript, no Node or DOM: DSP (`dsp/bpm.ts`, `dsp/key.ts`, `dsp/fft.ts`,
 `dsp/peaks.ts`, `dsp/synth.ts` for test signals), Camelot maths, filename parsing/renaming, and the types.
 
@@ -72,7 +86,8 @@ Key invariants:
 - `tests/ui.test.tsx` — jsdom (per-file `@vitest-environment jsdom`), renders `App` with the mock API and a fake
   worker, runs axe (contrast disabled). Colour contrast is instead checked by parsing tokens in `styles.css`, so
   renaming CSS variables can break that test.
-- `tests/setup.ts` stubs `ResizeObserver`, `matchMedia` and fakes element sizes; without it the virtual list renders
+- `tests/audio.test.ts` — WAV read/write round trips, header sniffing, every edit operation, `editName`.
+- `tests/setup.ts` stubs `ResizeObserver`, `matchMedia`, canvas `getContext` (returns null) and fakes element sizes; without it the virtual list renders
   zero rows.
 
 ## Notes

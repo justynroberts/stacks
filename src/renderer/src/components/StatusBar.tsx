@@ -19,7 +19,7 @@ export function StatusBar() {
         <span className="w-8 text-muted">{analysed}%</span>
       </span>
       <span aria-live="polite">{visible.length.toLocaleString()} / {samples.length.toLocaleString()} SHOWN</span>
-      <span className="hidden xl:inline">SPACE PREVIEWS · DRAG A ROW INTO YOUR DAW</span>
+      <span className="hidden xl:inline">SPACE PREVIEWS · L LOOPS · E EDITS · DRAG A ROW INTO YOUR DAW</span>
     </footer>
   );
 }

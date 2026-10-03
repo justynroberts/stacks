@@ -2,7 +2,8 @@ import { encodeWav, synthLoop } from '@shared/dsp/synth';
 import { foldBpm } from '@shared/dsp/bpm';
 import { computePeaks } from '@shared/dsp/peaks';
 import { keyInfo } from '@shared/camelot';
-import { buildName, splitName } from '@shared/filename';
+import { readWav } from '@shared/audio/wav';
+import { buildName, editName, splitName } from '@shared/filename';
 import { type Analysis, ANALYSIS_VERSION, type Drive, type QueueItem, type Result, type Sample, type StacksApi } from '@shared/types';
 
 const SR = 22050;
@@ -178,6 +179,24 @@ export function createMockApi(opts: MockOptions = {}): StacksApi {
       audio.set(copy.id, audio.get(id)!);
       fire([copy], []);
       return { ok: true, value: copy };
+    },
+    writeEdit: async (id, wav, target): Promise<Result<Sample>> => {
+      const s = samples.get(id);
+      const pcm = readWav(wav);
+      if (!s || !pcm) return { ok: false, error: 'The edit did not produce a valid WAV file' };
+      const mono = pcm.channels[0]!;
+      const fresh = target.kind === 'new';
+      const drive = fresh && target.driveId !== null ? drives.find((d) => d.id === target.driveId) : undefined;
+      if (fresh && target.driveId !== null && !drive) return { ok: false, error: 'That drive is not connected' };
+      const name = fresh ? editName(s.name, s.analysis?.bpm ?? null, s.analysis?.keyShort ?? null, target.label) : `${splitName(s.name).base}.wav`;
+      const driveId = drive?.id ?? s.driveId;
+      const relPath = drive ? `Stacks/${name}` : s.relPath.replace(/[^/]*$/, name);
+      const where = drive ? `${drive.mount}/Stacks/${name}` : s.path ? s.path.replace(/[^/]*$/, name) : null;
+      const next: Sample = { ...s, id: fresh ? ID_OF(relPath, driveId) : s.id, driveId, name, ext: 'wav', relPath, path: where, size: wav.byteLength, mtimeMs: Date.now(), analysis: undefined };
+      samples.set(next.id, next);
+      audio.set(next.id, mono);
+      fire([next], []);
+      return { ok: true, value: next };
     },
     reveal: () => undefined,
     startDrag: () => undefined,

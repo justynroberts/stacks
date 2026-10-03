@@ -34,7 +34,7 @@ function Ruler({ a }: { a: Analysis | undefined }) {
 
 /** The clip view: the selected sample across the bottom of the window. */
 export function DetailPanel() {
-  const { selected: s, mounted, preview, rename, copy, api, driveNames } = useStore();
+  const { selected: s, mounted, preview, rename, copy, api, driveNames, openEditor } = useStore();
   const [target, setTarget] = useState<string>('');
   const [busy, setBusy] = useState<'rename' | 'copy' | null>(null);
 
@@ -75,7 +75,7 @@ export function DetailPanel() {
         )}
       </div>
 
-      <div className="flex min-w-0 flex-col bg-bg">
+      <div className="relative flex min-w-0 flex-col bg-bg">
         <Ruler a={a} />
         <button
           type="button"
@@ -103,6 +103,16 @@ export function DetailPanel() {
             {playing ? 'STOP' : 'PLAY'} · SPACE
           </span>
         </button>
+        <button
+          type="button"
+          onClick={() => preview.setLoop(!preview.loop)}
+          aria-pressed={preview.loop}
+          title="Loop the whole sample, gaplessly, to hear whether it needs editing (L)"
+          className={`absolute bottom-2 right-2 flex items-center gap-2 border bg-bg px-2 py-[2px] text-label font-semibold ${preview.loop ? 'border-fg text-fg' : 'border-line-strong text-muted hover:text-fg'}`}
+        >
+          <span className={`h-[6px] w-[6px] ${preview.loop ? 'bg-accent' : 'bg-line-strong'}`} aria-hidden="true" />
+          LOOP · L
+        </button>
       </div>
 
       <div className="flex min-w-0 flex-col gap-3 border-l border-line px-4 py-3">
@@ -124,6 +134,16 @@ export function DetailPanel() {
         </div>
 
         <div className="mt-auto flex flex-col gap-2">
+          <button
+            type="button"
+            onClick={() => openEditor(s.id)}
+            disabled={!s.path}
+            title="Trim, fade, normalise and more (E)"
+            className="flex h-8 items-center justify-center gap-2 border border-fg font-semibold hover:bg-fg hover:text-bg"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M1 7h2l1.5-4 2 8 2-6 1.5 2h3" /></svg>
+            Edit sample
+          </button>
           <button
             type="button"
             onClick={doRename}

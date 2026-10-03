@@ -9,7 +9,8 @@ import { ImportQueue } from './components/ImportQueue';
 import { SampleTable } from './components/SampleTable';
 import { Sidebar } from './components/Sidebar';
 import { StatusBar } from './components/StatusBar';
-import { StoreProvider } from './store';
+import { Editor } from './editor/Editor';
+import { StoreProvider, useStore } from './store';
 
 /** Window level drag and drop. Without this Electron would navigate to a dropped file. */
 function useFileDrop(api: StacksApi): boolean {
@@ -44,19 +45,26 @@ function useFileDrop(api: StacksApi): boolean {
 
 function Shell({ api }: { api: StacksApi }) {
   const dragging = useFileDrop(api);
+  const { editing } = useStore();
   return (
     <div className="flex h-full flex-col bg-bg text-body text-fg">
       <Header />
       <div className="flex min-h-0 flex-1">
         <Sidebar />
-        <main className="flex min-w-0 flex-1 flex-col">
-          <FilterBar />
-          <div className="relative flex min-h-0 flex-1 flex-col">
-            <SampleTable />
-            <DropZone dragging={dragging} />
-          </div>
+        <main className="relative flex min-w-0 flex-1 flex-col">
+          {editing ? (
+            <Editor key={editing.id} sample={editing} />
+          ) : (
+            <>
+              <FilterBar />
+              <div className="relative flex min-h-0 flex-1 flex-col">
+                <SampleTable />
+              </div>
+            </>
+          )}
           <ImportQueue />
-          <DetailPanel />
+          {!editing && <DetailPanel />}
+          <DropZone dragging={dragging} />
         </main>
       </div>
       <StatusBar />

@@ -33,7 +33,7 @@ function status(s: Sample, run: string | undefined): { text: string; hot: boolea
 }
 
 export function SampleTable() {
-  const { visible, selected, select, sort, setSort, driveNames, runState, preview, api } = useStore();
+  const { visible, selected, select, sort, setSort, driveNames, runState, preview, api, openEditor } = useStore();
   const scroller = useRef<HTMLDivElement>(null);
 
   const virt = useVirtualizer({
@@ -62,6 +62,8 @@ export function SampleTable() {
       case 'Home': e.preventDefault(); move(0); break;
       case 'End': e.preventDefault(); move(visible.length - 1); break;
       case ' ': if (selected) { e.preventDefault(); preview.toggle(selected.id); } break;
+      case 'l': case 'L': if (!e.metaKey && !e.ctrlKey) { e.preventDefault(); preview.setLoop(!preview.loop); } break;
+      case 'e': case 'E': if (selected?.path && !e.metaKey && !e.ctrlKey) { e.preventDefault(); openEditor(selected.id); } break;
     }
   };
 
@@ -73,7 +75,7 @@ export function SampleTable() {
       aria-activedescendant={selected ? rowId(selected.id) : undefined}
       tabIndex={0}
       onKeyDown={onKey}
-      title="Arrow keys move, space previews"
+      title="Arrow keys move, space previews, L loops, E edits"
       className="flex min-h-0 flex-1 flex-col outline-offset-[-2px]"
     >
       <div role="row" className={`${GRID} h-7 flex-none items-center border-b border-line-strong pl-[3px] pr-4 text-label font-semibold text-faint`}>

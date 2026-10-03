@@ -59,3 +59,14 @@ export function buildName(name: string, bpm: number | null, keyShort: string | n
   if (bpm) bits.push(`${Math.round(bpm)}bpm`);
   return `${bits.join('_')}${ext ? '.' + ext : ''}`;
 }
+
+/**
+ * Name for a file made in the editor: "_edit" (or another label, such as "loop_2bar") goes before any key / tempo
+ * tags, so a later rename still finds them at the end. Always .wav, since that is what the editor writes.
+ */
+export function editName(name: string, bpm: number | null, keyShort: string | null, label = 'edit'): string {
+  const { base } = splitName(name);
+  const clean = cleanBase(name, bpm, keyShort);
+  const tail = base.startsWith(clean) ? base.slice(clean.length) : '';
+  return `${clean}_${label}${tail}.wav`;
+}

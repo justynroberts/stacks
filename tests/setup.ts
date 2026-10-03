@@ -8,6 +8,8 @@ if (typeof window !== 'undefined') {
     window.matchMedia = ((q: string) => ({ matches: false, media: q, onchange: null, addListener() {}, removeListener() {}, addEventListener() {}, removeEventListener() {}, dispatchEvent: () => false })) as typeof window.matchMedia;
   }
   Element.prototype.scrollIntoView ??= () => {};
+  // jsdom has no canvas; the editor draws nothing there, which is fine for behaviour tests.
+  HTMLCanvasElement.prototype.getContext = (() => null) as typeof HTMLCanvasElement.prototype.getContext;
   // jsdom does no layout, so every element measures 0x0 and the virtual list would render nothing.
   Object.defineProperty(HTMLElement.prototype, 'offsetHeight', { configurable: true, value: 640 });
   Object.defineProperty(HTMLElement.prototype, 'offsetWidth', { configurable: true, value: 800 });
