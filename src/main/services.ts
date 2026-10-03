@@ -49,17 +49,31 @@ export class Services {
   readonly library: Library;
   private queue: JobQueue;
   private known = new Set<string>();
+  /** Mount point of each drive as last reported, to notice drives appearing, leaving or moving. */
+  private mounts = new Map<string, string>();
+  /**
+   * Resolves once the library is loaded and the drives are known. The page asks for samples as soon as it loads,
+   * which can be before drive detection has finished; answering then would hand it every sample without a path
+   * (shown offline, never analysed).
+   */
+  readonly ready: Promise<void>;
+  private markReady!: () => void;
 
   constructor(private emit: Emit) {
+    this.ready = new Promise((r) => { this.markReady = r; });
     this.watcher = new DriveWatcher((live) => this.onDrives(live));
     this.library = new Library(path.join(app.getPath('userData'), 'library.json'), (d, r) => this.resolve(d, r));
     this.queue = new JobQueue((items) => emit.queue(items));
   }
 
   async start(): Promise<void> {
-    await this.library.load();
-    const live = await this.watcher.start();
-    this.onDrives(live);
+    try {
+      await this.library.load();
+      const live = await this.watcher.start();
+      this.onDrives(live);
+    } finally {
+      this.markReady();
+    }
   }
 
   async stop(): Promise<void> {
@@ -94,6 +108,12 @@ export class Services {
   private onDrives(live: Drive[]): void {
     this.library.rememberDrives(live);
     this.emit.drives(this.driveList());
+    // A drive that appeared, left, or came back somewhere else: its samples' paths changed, so send them again.
+    const now = new Map(live.map((d) => [d.id, d.mount]));
+    const moved = [...new Set([...now.keys(), ...this.mounts.keys()])].filter((id) => now.get(id) !== this.mounts.get(id));
+    this.mounts = now;
+    const refreshed = moved.filter((id) => !this.library.isExcluded(id)).flatMap((id) => this.library.forDrive(id));
+    if (refreshed.length) this.emit.samples(refreshed, []);
     for (const d of live) {
       const key = `${d.id}@${d.mount}`;
       if (this.known.has(key)) continue;

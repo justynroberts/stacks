@@ -44,7 +44,9 @@ export function AboutButton() {
         ref={dlg}
         aria-labelledby="about-title"
         onClick={(e) => { if (e.target === dlg.current) close(); }}
-        className="about m-auto w-[300px] border border-line-strong bg-bg p-0 text-body text-fg"
+        // The dialog is a child of the header, which is the window's drag region: without no-drag, Electron treats
+        // every click inside it as a window drag and Close never fires.
+        className="about no-drag m-auto w-[300px] border border-line-strong bg-bg p-0 text-body text-fg"
       >
         <div className="flex items-center justify-between border-b border-line bg-raised px-4 py-3">
           <h2 id="about-title"><Logo size={18} /></h2>

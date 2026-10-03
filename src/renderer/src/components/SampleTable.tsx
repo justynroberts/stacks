@@ -1,19 +1,21 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { type KeyboardEvent, useEffect, useRef } from 'react';
+import { type KeyboardEvent, useEffect, useMemo, useRef } from 'react';
 import type { Sample } from '@shared/types';
-import { fmtLen, type SortKey } from '../filters';
+import { dirOf, fmtLen, folderKey, type SortKey } from '../filters';
 import { useStore } from '../store';
 import { Waveform } from './Waveform';
 
 export const ROW = 30;
 const rowId = (id: string): string => `row-${id.replace(/[^A-Za-z0-9_-]/g, '_')}`;
-const GRID = 'grid grid-cols-[40px_112px_minmax(0,1fr)_112px_48px_56px_40px_52px_96px] gap-x-3';
+const GRID = 'grid grid-cols-[40px_112px_minmax(0,1.3fr)_minmax(0,1fr)_48px_56px_40px_52px_96px] gap-x-3';
+
+type Item = { kind: 'row'; s: Sample; n: number } | { kind: 'group'; driveId: string; dir: string; count: number; key: string };
 
 const COLS: Array<{ key: SortKey | null; label: string; right?: boolean; pad?: boolean }> = [
   { key: null, label: '#' },
   { key: null, label: 'CLIP' },
   { key: 'name', label: 'NAME' },
-  { key: 'drive', label: 'DRIVE' },
+  { key: 'folder', label: 'FOLDER' },
   { key: 'bpm', label: 'BPM', right: true },
   { key: 'key', label: 'KEY', pad: true },
   { key: null, label: 'CAM' },
@@ -33,11 +35,34 @@ function status(s: Sample, run: string | undefined): { text: string; hot: boolea
 }
 
 export function SampleTable() {
-  const { visible, selected, select, sort, setSort, driveNames, runState, preview, api, openEditor } = useStore();
+  const { visible, selected, select, sort, setSort, driveNames, runState, preview, api, openEditor, filters, setFilters, drives } = useStore();
   const scroller = useRef<HTMLDivElement>(null);
+  const manyDrives = new Set(visible.map((s) => s.driveId)).size > 1 || drives.filter((d) => d.mounted && !d.excluded).length > 2;
+
+  // With grouping on, a heading row goes in front of each folder; the list is already sorted folder by folder.
+  const { items, itemOf } = useMemo(() => {
+    const out: Item[] = [];
+    const where = new Map<string, number>();
+    if (!filters.groupByFolder) {
+      visible.forEach((s, n) => { where.set(s.id, n); out.push({ kind: 'row', s, n }); });
+      return { items: out, itemOf: where };
+    }
+    const counts = new Map<string, number>();
+    for (const s of visible) { const k = folderKey(s, driveNames); counts.set(k, (counts.get(k) ?? 0) + 1); }
+    let last = '';
+    visible.forEach((s, n) => {
+      const k = folderKey(s, driveNames);
+      if (k !== last) { out.push({ kind: 'group', driveId: s.driveId, dir: dirOf(s.relPath), count: counts.get(k) ?? 0, key: k }); last = k; }
+      where.set(s.id, out.length);
+      out.push({ kind: 'row', s, n });
+    });
+    return { items: out, itemOf: where };
+  }, [visible, filters.groupByFolder, driveNames]);
+
+  const showFolder = (driveId: string, dir: string) => setFilters({ drive: driveId, folder: dir });
 
   const virt = useVirtualizer({
-    count: visible.length,
+    count: items.length,
     getScrollElement: () => scroller.current,
     estimateSize: () => ROW,
     overscan: 12,
@@ -45,9 +70,10 @@ export function SampleTable() {
   });
 
   const selIndex = selected ? visible.findIndex((s) => s.id === selected.id) : -1;
+  const selItem = selected ? itemOf.get(selected.id) ?? -1 : -1;
   useEffect(() => {
-    if (selIndex >= 0) virt.scrollToIndex(selIndex, { align: 'auto' });
-  }, [selIndex]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (selItem >= 0) virt.scrollToIndex(selItem, { align: 'auto' });
+  }, [selItem]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onKey = (e: KeyboardEvent) => {
     const move = (to: number) => {
@@ -71,7 +97,7 @@ export function SampleTable() {
     <div
       role="grid"
       aria-label="Samples"
-      aria-rowcount={visible.length + 1}
+      aria-rowcount={items.length + 1}
       aria-activedescendant={selected ? rowId(selected.id) : undefined}
       tabIndex={0}
       onKeyDown={onKey}
@@ -113,8 +139,30 @@ export function SampleTable() {
         )}
         <div role="presentation" style={{ height: virt.getTotalSize(), position: 'relative' }}>
           {virt.getVirtualItems().map((v) => {
-            const s = visible[v.index];
-            if (!s) return null;
+            const item = items[v.index];
+            if (!item) return null;
+            const place = { position: 'absolute' as const, top: 0, left: 0, width: '100%', height: ROW, transform: `translateY(${v.start}px)` };
+            if (item.kind === 'group') {
+              const active = filters.drive === item.driveId && filters.folder === item.dir;
+              return (
+                <div key={`g:${item.key}`} role="row" aria-rowindex={v.index + 2} style={place} className="flex items-end border-b border-line-strong bg-raised px-3 pb-1">
+                  <div role="gridcell" aria-colspan={9} className="flex min-w-0 items-baseline gap-3">
+                    <button
+                      type="button"
+                      onClick={() => showFolder(item.driveId, active ? '' : item.dir)}
+                      title={active ? 'Show the whole drive again' : 'Show only this folder'}
+                      className="truncate text-left font-bold hover:underline hover:decoration-accent hover:decoration-2 hover:underline-offset-4"
+                    >
+                      {item.dir || 'Top of the drive'}
+                    </button>
+                    <span className="flex-none text-label text-faint">
+                      {manyDrives ? `${(driveNames.get(item.driveId) ?? '').toUpperCase()} · ` : ''}{item.count.toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              );
+            }
+            const s = item.s;
             const on = selected?.id === s.id;
             const a = s.analysis;
             const st = status(s, runState.get(s.id));
@@ -129,10 +177,10 @@ export function SampleTable() {
                 onDragStart={(e) => { e.preventDefault(); api.startDrag(s.id); }}
                 onClick={() => select(s.id)}
                 onDoubleClick={() => preview.toggle(s.id)}
-                style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: ROW, transform: `translateY(${v.start}px)` }}
+                style={place}
                 className={`${GRID} cursor-default items-center border-b border-l-[3px] border-b-line pr-4 ${on ? 'border-l-accent bg-sel' : 'border-l-transparent hover:bg-raised'} ${s.path ? '' : 'opacity-60'}`}
               >
-                <span role="gridcell" className="pl-2 text-label text-faint">{String(v.index + 1).padStart(3, '0')}</span>
+                <span role="gridcell" className="pl-2 text-label text-faint">{String(item.n + 1).padStart(3, '0')}</span>
                 {/* Each sample is drawn as a clip; the selected one is lit. */}
                 <span role="gridcell" className={`flex h-[22px] items-center border px-1 ${on ? 'border-accent bg-accent text-accent-ink' : 'border-line-strong bg-raised text-muted'}`}>
                   <Waveform peaks={a?.peaks} width={102} height={18} bars={48} />
@@ -140,7 +188,16 @@ export function SampleTable() {
                 <span role="gridcell" className={`truncate ${on ? 'font-bold' : 'font-medium'}`}>
                   {preview.playingId === s.id ? '▶ ' : ''}{s.name}
                 </span>
-                <span role="gridcell" className="truncate text-muted">{driveNames.get(s.driveId) ?? '··'}</span>
+                <span role="gridcell" className="min-w-0">
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); select(s.id); showFolder(s.driveId, dirOf(s.relPath)); }}
+                    title={`${driveNames.get(s.driveId) ?? ''} / ${dirOf(s.relPath)} (click to show only this folder)`}
+                    className="block w-full truncate text-left text-muted hover:text-fg hover:underline hover:decoration-accent hover:decoration-2 hover:underline-offset-4"
+                  >
+                    {dirOf(s.relPath) || driveNames.get(s.driveId) || '··'}
+                  </button>
+                </span>
                 <span role="gridcell" className="text-right font-semibold">{a?.bpm ? Math.round(a.bpm) : '··'}</span>
                 <span role="gridcell" className="pl-3 font-semibold">{a?.keyShort ?? '··'}</span>
                 <span role="gridcell" className="text-muted">{a?.camelot ?? '··'}</span>

@@ -243,8 +243,16 @@ export function WaveView({ audio, summary, view, onView, sel, onSel, snap, beat,
     return () => el.removeEventListener('wheel', wheel);
   }, []);
 
-  // Drag to select; grab an edge to move it; click to place the cursor.
-  const drag = useRef<{ anchor: number; downX: number; moved: boolean } | null>(null);
+  // Drag to select; grab an edge to resize; grab the middle of a selection to slide it along at the same length;
+  // click to place the cursor.
+  const drag = useRef<{ anchor: number; downX: number; moved: boolean; slide?: { start: number; len: number; at: number } } | null>(null);
+  const zone = (px: number): 'edge' | 'inside' | 'outside' => {
+    const [s, e] = sel;
+    if (e <= s) return 'outside';
+    const xs = (s - view.start) / view.spp, xe = (e - view.start) / view.spp;
+    if (Math.abs(px - xs) <= 6 || Math.abs(px - xe) <= 6) return 'edge';
+    return px > xs && px < xe ? 'inside' : 'outside';
+  };
   const frameAt = (clientX: number) => {
     const rect = box.current!.getBoundingClientRect();
     return Math.max(0, Math.min(n, view.start + (clientX - rect.left) * view.spp));
@@ -256,29 +264,50 @@ export function WaveView({ audio, summary, view, onView, sel, onSel, snap, beat,
     const px = ev.clientX - rect.left;
     const [s, e] = sel;
     const xs = (s - view.start) / view.spp, xe = (e - view.start) / view.spp;
+    const where = zone(px);
+    if (where === 'inside') {
+      // Do not touch the selection yet: a click (no movement) still places the cursor, on release.
+      drag.current = { anchor: s, downX: ev.clientX, moved: false, slide: { start: s, len: e - s, at: frameAt(ev.clientX) } };
+      return;
+    }
     let anchor: number;
-    if (e > s && Math.abs(px - xe) <= 6) anchor = s;
-    else if (e > s && Math.abs(px - xs) <= 6) anchor = e;
+    if (where === 'edge' && Math.abs(px - xe) <= 6) anchor = s;
+    else if (where === 'edge') anchor = e;
     else anchor = snap(frameAt(ev.clientX), ev.altKey);
     drag.current = { anchor, downX: ev.clientX, moved: false };
-    if (!(e > s && (Math.abs(px - xe) <= 6 || Math.abs(px - xs) <= 6))) onSel([anchor, anchor]);
+    if (where !== 'edge') onSel([anchor, anchor]);
   };
   const onMove = (ev: React.PointerEvent) => {
     const d = drag.current;
     const rect = box.current!.getBoundingClientRect();
     if (!d) {
-      const [s, e] = sel;
-      const px = ev.clientX - rect.left;
-      const edge = e > s && (Math.abs(px - (s - view.start) / view.spp) <= 6 || Math.abs(px - (e - view.start) / view.spp) <= 6);
-      box.current!.style.cursor = edge ? 'ew-resize' : 'text';
+      const where = zone(ev.clientX - rect.left);
+      box.current!.style.cursor = where === 'edge' ? 'ew-resize' : where === 'inside' ? 'grab' : 'text';
       return;
     }
     if (Math.abs(ev.clientX - d.downX) > 2) d.moved = true;
     if (!d.moved) return;
+    if (d.slide) {
+      const { start, len, at } = d.slide;
+      box.current!.style.cursor = 'grabbing';
+      const wanted = Math.max(0, Math.min(n - len, start + (frameAt(ev.clientX) - at)));
+      // The start snaps; the length never changes.
+      const s2 = Math.max(0, Math.min(n - len, snap(wanted, ev.altKey)));
+      onSel([s2, s2 + len]);
+      return;
+    }
     const f = snap(frameAt(ev.clientX), ev.altKey);
     onSel([Math.min(d.anchor, f), Math.max(d.anchor, f)]);
   };
-  const onUp = () => { drag.current = null; };
+  const onUp = (ev: React.PointerEvent) => {
+    const d = drag.current;
+    drag.current = null;
+    // A click inside the selection, without dragging, places the cursor there.
+    if (d?.slide && !d.moved) {
+      const f = snap(frameAt(ev.clientX), ev.altKey);
+      onSel([f, f]);
+    }
+  };
 
   return (
     <div

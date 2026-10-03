@@ -186,7 +186,7 @@ describe('library screen', () => {
 
     await user.click(within(editor).getByRole('button', { name: 'LIBRARY' }));
     const row = await within(screen.getByRole('grid', { name: 'Samples' })).findByRole('row', { name: /rhodes_loop_dusty_loop_1bar_Am\.wav/ });
-    expect(within(row).getByText('MPC_SD_128')).toBeInTheDocument();
+    expect(within(row).getByTitle(/^MPC_SD_128 \/ Stacks /)).toBeInTheDocument();
   });
 
   it('finds a set of loops, splits, reverses and exports them as files', async () => {
@@ -246,6 +246,57 @@ describe('library screen', () => {
     expect(toggle).toHaveAttribute('aria-pressed', 'true');
     await user.click(toggle);
     expect(toggle).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('browses a drive by its folders', async () => {
+    mount();
+    const user = userEvent.setup();
+    const grid = await screen.findByRole('grid', { name: 'Samples' });
+    await within(grid).findByRole('row', { name: /rhodes_loop/ });
+    await user.click(screen.getByRole('button', { name: /^SAMPLES_SSD/ }));
+    const tree = await screen.findByRole('tree', { name: 'Folders on SAMPLES_SSD' });
+    // Top-level folders, with counts; Drums only holds Breaks here, so it shows as one line.
+    expect(within(tree).getByRole('button', { name: /^Keys and strings\s*2$/ })).toBeInTheDocument();
+    expect(within(tree).getByRole('button', { name: /^Drums\/Breaks\s*1$/ })).toBeInTheDocument();
+
+    await user.click(within(tree).getByRole('button', { name: /^Keys and strings/ }));
+    await waitFor(() => expect(within(grid).getAllByRole('row').length).toBe(3)); // header + rhodes + piano
+    expect(within(grid).getByRole('row', { name: /rhodes_loop_dusty_Am\.wav/ })).toBeInTheDocument();
+    expect(within(grid).getAllByRole('row', { name: /Keys and strings/ })).toHaveLength(2); // the folder column
+
+    // Another drive with nested folders: open Drums, pick One shots.
+    await user.click(screen.getByRole('button', { name: /^MPC_SD_128/ }));
+    const sd = await screen.findByRole('tree', { name: 'Folders on MPC_SD_128' });
+    await user.click(within(sd).getByRole('button', { name: 'Open Drums' }));
+    await user.click(within(sd).getByRole('button', { name: /^One shots/ }));
+    await waitFor(() => expect(within(grid).queryByRole('row', { name: /hat_closed_tight/ })).toBeInTheDocument());
+    expect(within(grid).queryByRole('row', { name: /perc_shaker/ })).toBeNull(); // in Breaks, not One shots
+    expect(within(grid).queryByRole('row', { name: /vox_chop/ })).toBeNull();
+  });
+
+  it('groups the list by folder, and filters to a folder from the list', async () => {
+    mount();
+    const user = userEvent.setup();
+    const grid = await screen.findByRole('grid', { name: 'Samples' });
+    await within(grid).findByRole('row', { name: /rhodes_loop/ });
+
+    await user.click(screen.getByRole('button', { name: 'GROUP BY FOLDER' }));
+    // A heading per folder, full path from the top of the drive, before its samples.
+    const heading = await within(grid).findAllByRole('button', { name: 'Keys and strings' });
+    expect(heading.length).toBeGreaterThan(0);
+    const rows = within(grid).getAllByRole('row').map((r) => r.textContent ?? '');
+    const at = rows.findIndex((t) => /^Keys and strings/.test(t));
+    expect(rows[at + 1]).toMatch(/Keys and strings/); // a sample row from that folder follows its heading
+
+    // The folder column shows the full path and narrows the list when clicked.
+    await user.click(screen.getByRole('button', { name: 'GROUP BY FOLDER' }));
+    const hat = await within(grid).findByRole('row', { name: /hat_closed_tight/ });
+    await user.click(within(hat).getByRole('button', { name: 'Drums/One shots' }));
+    await waitFor(() => expect(within(grid).queryByRole('row', { name: /rhodes_loop/ })).toBeNull());
+    expect(within(grid).getByRole('row', { name: /snare_crack/ })).toBeInTheDocument();
+    expect(screen.getByRole('tree', { name: 'Folders on MPC_SD_128' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Show all folders' }));
+    await waitFor(() => expect(within(grid).getByRole('row', { name: /perc_shaker/ })).toBeInTheDocument());
   });
 
   it('has an about button crediting FintonLabs', async () => {

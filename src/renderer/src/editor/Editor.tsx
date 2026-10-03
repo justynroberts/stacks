@@ -222,19 +222,25 @@ export function Editor({ sample }: { sample: Sample }) {
     if (!audio) return;
     if (player.current.playing) { setAuditioning(null); return stop(); }
     reversedPlay.current = false;
-    const [from, to] = hasSel ? sel : [sel[0] >= n ? 0 : sel[0], n];
-    player.current.play(audio, from, to, loop && hasSel, () => setPlaying(false));
+    // With a selection: play (or loop) it. Without one: from the cursor to the end, or, looping, the whole sample
+    // round and round, starting at the cursor.
+    const cursor = sel[0] >= n ? 0 : sel[0];
+    if (hasSel) player.current.play(audio, sel[0], sel[1], loop, () => setPlaying(false));
+    else player.current.play(audio, loop ? 0 : cursor, n, loop, () => setPlaying(false), cursor);
     setPlaying(player.current.playing);
   }, [audio, hasSel, sel, n, loop, stop]);
 
   // Moving the loop points while a loop plays: the running sound picks them up (new end when it gets there, new
   // start on the next pass). Toggling Loop mid-play carries on rather than restarting.
   // Selections under 10 ms (a drag just starting) are skipped so the loop never buzzes.
+  // No selection means the whole sample is the loop.
   useEffect(() => {
-    if (playing && !reversedPlay.current && sel[1] - sel[0] >= rate * 0.01) player.current.updateLoop(sel[0], sel[1]);
-  }, [playing, sel, rate]);
+    if (!playing || reversedPlay.current) return;
+    if (sel[1] - sel[0] >= rate * 0.01) player.current.updateLoop(sel[0], sel[1]);
+    else if (sel[1] === sel[0]) player.current.updateLoop(0, n);
+  }, [playing, sel, rate, n]);
   useEffect(() => {
-    if (playing && !reversedPlay.current && (hasSel || !loop)) player.current.setLooping(loop && hasSel, sel[0], sel[1]);
+    if (playing && !reversedPlay.current) player.current.setLooping(loop, hasSel ? sel[0] : 0, hasSel ? sel[1] : n);
   }, [loop]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Playhead follows the audio without re-rendering React every frame.
@@ -622,13 +628,13 @@ export function Editor({ sample }: { sample: Sample }) {
             onClick={play}
             disabled={!audio}
             aria-pressed={playing}
-            title={hasSel ? 'Play the selection (Space)' : 'Play from the cursor (Space)'}
+            title={hasSel ? 'Play the selection (Space)' : loop ? 'Loop the whole sample (Space)' : 'Play from the cursor (Space)'}
             className="flex h-9 w-[84px] items-center justify-center gap-2 bg-fg font-bold text-bg"
           >
             <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">{playing ? <rect x="1" y="1" width="8" height="8" fill="currentColor" /> : <path d="M1.5 1v8l7-4z" fill="currentColor" />}</svg>
             {playing ? 'STOP' : 'PLAY'}
           </button>
-          <button type="button" onClick={() => setLoop((x) => !x)} aria-pressed={loop} title="Loop the selection (L)" className={`flex h-9 items-center gap-2 border px-3 text-label font-semibold ${loop ? 'border-fg text-fg' : 'border-line-strong text-muted hover:text-fg'}`}>
+          <button type="button" onClick={() => setLoop((x) => !x)} aria-pressed={loop} title="Loop the selection, or the whole sample when nothing is selected (L)" className={`flex h-9 items-center gap-2 border px-3 text-label font-semibold ${loop ? 'border-fg text-fg' : 'border-line-strong text-muted hover:text-fg'}`}>
             <span className={`h-[6px] w-[6px] ${loop ? 'bg-accent' : 'bg-line-strong'}`} aria-hidden="true" />LOOP
           </button>
         </div>

@@ -92,6 +92,16 @@ describe('Player loops', () => {
     expect(player.position()).toBe(1300);
   });
 
+  it('loops the whole sample from the cursor: first pass from the cursor, then start to end', () => {
+    const { player, at, live } = fakeAudio();
+    player.play(audio, 0, 10_000, true, () => undefined, 6000);
+    expect(live()).toEqual([[0, 6000, 10000]]);
+    at(3.9);
+    expect(live()).toEqual([[0, 6000, 10000], [4, 0, 10000]]);
+    at(4.5);
+    expect(player.position()).toBe(500);
+  });
+
   it('keeps very short loops gapless by queuing several passes', () => {
     const { player, at, live } = fakeAudio();
     player.play(audio, 1000, 1050, true, () => undefined); // 50 ms

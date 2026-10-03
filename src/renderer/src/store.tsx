@@ -202,7 +202,7 @@ export function StoreProvider({ api, demo, createWorker, children }: { api: Stac
 
   const driveNames = useMemo(() => new Map(drives.map((d) => [d.id, d.name])), [drives]);
   const visible = useMemo(
-    () => sortSamples(applyFilters(samples, filters, selected, driveNames), sort, driveNames),
+    () => sortSamples(applyFilters(samples, filters, selected, driveNames), sort, driveNames, filters.groupByFolder),
     [samples, filters, selected, sort, driveNames]
   );
 
@@ -259,7 +259,7 @@ export function StoreProvider({ api, demo, createWorker, children }: { api: Stac
 
   // A drive filter pointing at a drive that is now excluded would show an empty list with no way to tell why.
   useEffect(() => {
-    if (filters.drive !== 'all' && drives.some((d) => d.id === filters.drive && d.excluded)) setFiltersState((f) => ({ ...f, drive: 'all' }));
+    if (filters.drive !== 'all' && drives.some((d) => d.id === filters.drive && d.excluded)) setFiltersState((f) => ({ ...f, drive: 'all', folder: '' }));
   }, [drives, filters.drive]);
 
   const openEditor = useCallback((id: string) => {

@@ -33,7 +33,7 @@ function LinkFetch() {
 }
 
 export function FilterBar() {
-  const { filters, setFilters, selected } = useStore();
+  const { filters, setFilters, selected, driveNames } = useStore();
   const canMatch = !!selected?.analysis?.camelot || !!selected?.analysis?.bpm;
   return (
     <div className="flex h-11 flex-none items-center gap-5 border-b border-line px-4 text-label font-medium text-muted">
@@ -83,6 +83,28 @@ export function FilterBar() {
         <span className={`h-[6px] w-[6px] ${filters.matchSelected ? 'bg-accent' : 'bg-line-strong'}`} aria-hidden="true" />
         MIXES WITH SELECTED
       </button>
+
+      <button
+        type="button"
+        aria-pressed={filters.groupByFolder}
+        onClick={() => setFilters({ groupByFolder: !filters.groupByFolder })}
+        title="Order the list folder by folder, with a heading for each"
+        className={`flex h-7 items-center gap-2 border px-3 ${filters.groupByFolder ? 'border-fg bg-fg text-bg' : 'border-line-strong hover:text-fg'}`}
+      >
+        <span className={`h-[6px] w-[6px] ${filters.groupByFolder ? 'bg-accent' : 'bg-line-strong'}`} aria-hidden="true" />
+        GROUP BY FOLDER
+      </button>
+
+      {filters.folder && filters.drive !== 'all' && (
+        <span className="flex h-7 min-w-0 items-center gap-2 border border-fg pl-3 text-fg">
+          <span className="truncate normal-case tracking-normal" title={filters.folder}>
+            {(driveNames.get(filters.drive) ?? '').toUpperCase()} / {filters.folder}
+          </span>
+          <button type="button" aria-label="Show all folders" onClick={() => setFilters({ folder: '' })} className="flex h-7 w-7 flex-none items-center justify-center hover:bg-sel">
+            <svg width="10" height="10" viewBox="0 0 10 10" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7" /></svg>
+          </button>
+        </span>
+      )}
 
       <div className="flex-1" />
       <LinkFetch />

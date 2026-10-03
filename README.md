@@ -43,6 +43,10 @@ docker compose up --build        # http://localhost:5918
 
 ## What it does
 
+- **Folders**: select a drive in Places to see its folders as they are on disk, with counts (single-folder chains
+  shown as one line). Pick a folder to list it and everything under it. The list's Folder column shows the full path
+  from the top of the drive, sorts, and narrows the list when clicked; **Group by folder** orders the list folder by
+  folder with a heading for each; search matches folder names.
 - **Drives**: SD cards and USB drives are detected on mount (macOS `/Volumes`, Linux `/media` `/run/media` `/mnt`,
   Windows drive letters). A drive is remembered by its volume ID, so it keeps its samples when it comes back on a
   different mount point, and shows as OFFLINE when unplugged.
@@ -59,7 +63,8 @@ docker compose up --build        # http://localhost:5918
   (compatible key, tempo within 6%).
 - **Rename**: `rhodes_loop_dusty_Am_84bpm.wav` (key and tempo at the end, so sort order never changes), on disk, never overwriting (a clash gets `_2`). Idempotent.
 - **Edit**: press E (or Edit sample) for a waveform editor. Drag to select (edges snap to zero crossings, or to
-  16ths at the sample's tempo; hold Alt to bypass), then trim, delete, silence, trim silence, fade in/out, de-click,
+  16ths at the sample's tempo; hold Alt to bypass), drag an edge to resize, drag inside to slide the selection along
+  at the same length; Loop with nothing selected loops the whole sample; then trim, delete, silence, trim silence, fade in/out, de-click,
   ±3 dB, normalise or reverse. Undo/redo, zoom (pinch, Ctrl/Cmd+scroll, +/-, 0 to fit), selection playback with loop,
   and typed start/end times. WAV is edited at its own rate and bit depth; other formats are decoded at their own rate
   and saved as 24-bit WAV. **Save as copy** writes `name_edit.wav`; **Replace original** needs a second click and

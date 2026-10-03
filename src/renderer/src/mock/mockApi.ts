@@ -37,6 +37,15 @@ const SEEDS: Seed[] = [
 
 const ID_OF = (name: string, drive: string): string => `${drive}:${name}`;
 
+/** Where each demo sample sits on its drive, so the folder tree has something to show. */
+function folderOf(name: string): string {
+  if (/break|amen|perc|hat|snare|shaker/.test(name)) return /hat|snare/.test(name) ? 'Drums/One shots' : 'Drums/Breaks';
+  if (/rhodes|piano|strings|pluck|guitar/.test(name)) return 'Keys and strings';
+  if (/bass|808/.test(name)) return 'Bass';
+  if (/vox/.test(name)) return 'Vocals';
+  return 'FX';
+}
+
 function demoAudio(name: string, bpm: number | null, key: [number, boolean] | null, seconds: number): Float32Array {
   const chord = key ? (key[1] ? [key[0], key[0] + 3, key[0] + 7] : [key[0], key[0] + 4, key[0] + 7]).map((p) => p % 12) : [];
   return synthLoop({ bpm: bpm ?? 100, seconds: Math.min(seconds, 8), sampleRate: SR, chordPcs: chord, kick: seconds > 0.5 || !!bpm });
@@ -77,8 +86,9 @@ export function createMockApi(opts: MockOptions = {}): StacksApi {
     const id = ID_OF(name, drive);
     const { ext } = splitName(name);
     const mount = DRIVES.find((d) => d.id === drive)?.mount ?? '';
+    const rel = drive === 'local' ? `/Users/demo/Music/Samples/${folderOf(name)}/${name}` : `${folderOf(name)}/${name}`;
     samples.set(id, {
-      id, driveId: drive, relPath: name, path: `${mount}/${name}`, name, ext, size: Math.round(sec * 88200), mtimeMs: 1,
+      id, driveId: drive, relPath: rel, path: drive === 'local' ? rel : `${mount}/${rel}`, name, ext, size: Math.round(sec * 88200), mtimeMs: 1,
       analysis: seed[6] || opts.preanalysed ? analysisFor(seed) : undefined
     });
     audio.set(id, demoAudio(name, bpm, key, sec));
@@ -169,7 +179,7 @@ export function createMockApi(opts: MockOptions = {}): StacksApi {
       if (!s?.analysis) return { ok: false, error: 'Not analysed yet' };
       const next = buildName(s.name, s.analysis.bpm, s.analysis.keyShort);
       if (!next) return { ok: false, error: 'No key or BPM to write' };
-      const moved: Sample = { ...s, id: `${s.driveId}:${next}`, name: next, relPath: next, path: s.path ? s.path.replace(s.name, next) : null };
+      const moved: Sample = { ...s, id: `${s.driveId}:${next}`, name: next, relPath: s.relPath.replace(/[^/]*$/, next), path: s.path ? s.path.replace(s.name, next) : null };
       samples.delete(id);
       samples.set(moved.id, moved);
       audio.set(moved.id, audio.get(id)!);

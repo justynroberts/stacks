@@ -56,8 +56,11 @@ export class Player {
     return b;
   }
 
-  /** Frames [from, to), once or as a loop. onEnd fires when playback runs out on its own. */
-  play(a: PcmAudio, from: number, to: number, loop: boolean, onEnd: () => void): void {
+  /**
+   * Frames [from, to), once or as a loop. The first pass can begin part way in, at startAt (a loop over the whole
+   * sample started from the cursor). onEnd fires when playback runs out on its own.
+   */
+  play(a: PcmAudio, from: number, to: number, loop: boolean, onEnd: () => void, startAt = from): void {
     this.stop();
     if (!this.available || to - from < 1) return;
     if (!this.ctx || this.ctx.sampleRate !== a.sampleRate) {
@@ -71,7 +74,7 @@ export class Player {
     this.looping = loop;
     this.loopFrom = from;
     this.loopTo = to;
-    this.passes.push(this.schedule(this.ctx.currentTime, from, to));
+    this.passes.push(this.schedule(this.ctx.currentTime, Math.max(from, Math.min(startAt, to - 1)), to));
     if (this.autoTick) this.timer = setInterval(() => this.tick(), TICK_MS);
     this.tick();
   }

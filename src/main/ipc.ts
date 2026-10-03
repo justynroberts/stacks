@@ -8,8 +8,8 @@ const dragIcon = () => nativeImage.createFromBitmap(Buffer.alloc(32 * 32 * 4, 0x
 
 export function registerIpc(svc: Services): void {
   ipcMain.handle('app:checkUpdates', () => checkForUpdatesNow());
-  ipcMain.handle('drives:list', () => svc.driveList());
-  ipcMain.handle('samples:list', () => svc.library.all());
+  ipcMain.handle('drives:list', async () => { await svc.ready; return svc.driveList(); });
+  ipcMain.handle('samples:list', async () => { await svc.ready; return svc.library.all(); });
   ipcMain.handle('scan:drive', (_e, driveId: unknown) => {
     if (typeof driveId === 'string') svc.scanDrive(driveId);
   });
